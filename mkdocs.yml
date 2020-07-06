@@ -1,0 +1,15 @@
+site_name: DGeQ Documentation
+site_author: qcoumes
+repo_url: https://github.com/qcoumes/dgeq/
+
+nav:
+  - Introduction: index.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - Settings: settings.md
+  - Test it online!: a
+  - Changelog: CHANGES.md
+  - License: LICENSE.md
+  - Github: https://github.com/qcoumes/dgeq/
+
+theme: readthedocs

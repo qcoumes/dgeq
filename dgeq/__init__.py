@@ -1,0 +1,1 @@
+from .dgeq import GenericQuery
