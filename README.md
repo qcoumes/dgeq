@@ -1,0 +1,2 @@
+# dgeq
+Django Generic Query
