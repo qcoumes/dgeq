@@ -1,8 +1,11 @@
-from typing import Any, Type, Union
+from typing import Any, TYPE_CHECKING, Type, Union
 
 from django.conf import settings
 from django.db import models
 
+
+if TYPE_CHECKING:
+    from .censor import Censor
 
 # Default max depth before a field lookup fail. Can be overridden in settings.py
 MAX_FOREIGN_FIELD_DEPTH = getattr(settings, "DGEQ_MAX_FOREIGN_FIELD_DEPTH", 10)
@@ -54,12 +57,13 @@ class UnknownFieldError(DgeqError):
     details = ['valid_fields', 'unknown']
     
     
-    def __init__(self, model: Type[models.Model], unknown: str):
+    def __init__(self, model: Type[models.Model], unknown: str, censor: 'Censor'):
         include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
         
         self.model = model
         self.unknown = unknown
         self.valid_fields = [f.name for f in model._meta.get_fields(include_hidden=include_hidden)]
+        self.valid_fields = censor.censor(model, self.valid_fields)
     
     
     def __str__(self):
@@ -77,7 +81,8 @@ class NotARelatedFieldError(DgeqError):
     details = ['model_name', 'field', 'foreign_fields']
     
     
-    def __init__(self, model: Union[Type[models.Model], models.Model], field: str):
+    def __init__(self, model: Union[Type[models.Model], models.Model], field: str,
+                 censor: 'Censor'):
         include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
         
         self.model = model
@@ -87,6 +92,7 @@ class NotARelatedFieldError(DgeqError):
             f.name for f in model._meta.get_fields(include_hidden=include_hidden) if
             f.remote_field is not None
         ]
+        self.foreign_fields = censor.censor(model, self.foreign_fields)
     
     
     def __str__(self):

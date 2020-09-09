@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.http import QueryDict
 from django.test import TestCase
 
@@ -12,10 +13,15 @@ class DgeqTestCase(TestCase):
     fixtures = ["tests/django_dummy_app/geography_data.json"]
     
     
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = AnonymousUser()
+    
+    
     @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
     def test_step(self):
         query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         self.assertEqual(True, dgeq.case)
         self.assertEqual(True, dgeq.related)
         self.assertNotIn("time", dgeq.result)
@@ -39,7 +45,7 @@ class DgeqTestCase(TestCase):
     @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
     def test_2_step_1_step(self):
         query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         self.assertEqual(True, dgeq.case)
         self.assertEqual(True, dgeq.related)
         self.assertNotIn("time", dgeq.result)
@@ -58,7 +64,7 @@ class DgeqTestCase(TestCase):
     @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
     def test_1_step_2_step(self):
         query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         self.assertEqual(True, dgeq.case)
         self.assertEqual(True, dgeq.related)
         self.assertNotIn("time", dgeq.result)
@@ -77,7 +83,7 @@ class DgeqTestCase(TestCase):
     @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
     def test_step_none(self):
         query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         self.assertEqual(True, dgeq.case)
         self.assertEqual(True, dgeq.related)
         self.assertNotIn("time", dgeq.result)
@@ -91,7 +97,7 @@ class DgeqTestCase(TestCase):
     @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
     def test_1_step_none(self):
         query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         self.assertEqual(True, dgeq.case)
         self.assertEqual(True, dgeq.related)
         self.assertNotIn("time", dgeq.result)
@@ -109,7 +115,7 @@ class DgeqTestCase(TestCase):
     
     def test_dgeq_error(self):
         query_dict = QueryDict("c:case=invalid")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         res = dgeq.evaluate()
         self.assertEqual(False, res["status"])
         self.assertEqual("INVALID_VALUE_ERROR", res["code"])
@@ -119,7 +125,7 @@ class DgeqTestCase(TestCase):
     
     def test_evaluate_simple(self):
         query_dict = QueryDict("name=Germany")
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         res = dgeq.evaluate()
         self.assertEqual(True, res["status"])
         self.assertEqual(Country.objects.get(name="Germany").id, res["rows"][0]["id"])
@@ -136,7 +142,7 @@ class DgeqTestCase(TestCase):
             "&eu_countries_count=[3&c:show=name,countries&c:limit=0"
             "&c:join=field=countries|show=name"
         )
-        dgeq = GenericQuery(River, query_dict)
+        dgeq = GenericQuery(self.user, River, query_dict)
         res = dgeq.evaluate()
         expected = {
             'status': True,
@@ -228,7 +234,7 @@ class DgeqTestCase(TestCase):
             "c:annotate=field=mountains.height|func=sum|to=sum_mountains_height|early=1"
             "&sum_mountains_height=>100000&c:show=name,id,area&c:limit=0&c:sort=name"
         )
-        dgeq = GenericQuery(Country, query_dict)
+        dgeq = GenericQuery(self.user, Country, query_dict)
         res = dgeq.evaluate()
         expected = {
             "status": True,
@@ -311,7 +317,7 @@ class DgeqTestCase(TestCase):
             "&c:join=field=continent|show=name"
             "&c:join=field=countries|show=name|sort=population|limit=1"
         )
-        dgeq = GenericQuery(Region, query_dict)
+        dgeq = GenericQuery(self.user, Region, query_dict)
         res = dgeq.evaluate()
         expected = {
             "status": True,
@@ -381,9 +387,9 @@ class DgeqTestCase(TestCase):
         self.assertEqual(expected, res)
     
     
-    def test_hidden(self):
-        query_dict = QueryDict("c:join=field=rivers")
-        dgeq = GenericQuery(Country, query_dict, {
+    def test_private(self):
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        dgeq = GenericQuery(self.user, Country, query_dict, private_fields={
             River:   ["countries", "discharge"],
             Country: ["forests", "mountains", "disasters"]
         })
@@ -415,9 +421,96 @@ class DgeqTestCase(TestCase):
         self.assertEqual(expected, res)
     
     
-    def test_hidden_cause_unknown_field(self):
+    def test_private_cause_unknown_field(self):
         query_dict = QueryDict("population=>100000000")
-        dgeq = GenericQuery(Country, query_dict, {Country: ["population"]})
+        dgeq = GenericQuery(self.user, Country, query_dict, private_fields={Country: ["population"]})
+        res = dgeq.evaluate()
+        self.assertIn("code", res)
+        self.assertEqual("UNKNOWN_FIELD", res["code"])
+    
+    
+    def test_public(self):
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        dgeq = GenericQuery(self.user, Country, query_dict, public_fields={
+            River:   ["length", "id", "name"],
+            Country: ["area", "id", "population", "name", "region", "rivers"]
+        })
+        res = dgeq.evaluate()
+        expected = {
+            "status": True,
+            "rows":   [
+                {
+                    "area":       652864,
+                    "id":         1,
+                    "population": 36296100,
+                    "name":       "Afghanistan",
+                    "region":     15,
+                    "rivers":     [
+                        {
+                            "length": 2620,
+                            "id":     37,
+                            "name":   "Amu Darya–Panj"
+                        },
+                        {
+                            "length": 1130,
+                            "id":     165,
+                            "name":   "Helmand"
+                        }
+                    ]
+                }
+            ]
+        }
+        self.assertEqual(expected, res)
+    
+    
+    def test_public_cause_unknown_field(self):
+        query_dict = QueryDict("area=>100000000")
+        dgeq = GenericQuery(self.user, Country, query_dict, public_fields={Country: ["population"]})
+        res = dgeq.evaluate()
+        self.assertIn("code", res)
+        self.assertEqual("UNKNOWN_FIELD", res["code"])
+    
+    
+    def test_permission_and_private(self):
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        user = User.objects.create_user("test")
+        user.user_permissions.add(Permission.objects.get(codename='view_country'))
+        user.user_permissions.add(Permission.objects.get(codename='view_river'))
+        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True, private_fields={
+            River: ["discharge", "countries"]
+        })
+        res = dgeq.evaluate()
+        expected = {
+            "status": True,
+            "rows":   [
+                {
+                    "area":       652864,
+                    "id":         1,
+                    "population": 36296100,
+                    "name":       "Afghanistan",
+                    "rivers":     [
+                        {
+                            "length": 2620,
+                            "id":     37,
+                            "name":   "Amu Darya–Panj"
+                        },
+                        {
+                            "length": 1130,
+                            "id":     165,
+                            "name":   "Helmand"
+                        }
+                    ]
+                }
+            ]
+        }
+        self.assertEqual(expected, res)
+    
+    
+    def test_permission_cause_unknown_field(self):
+        query_dict = QueryDict("rivers.length=>1000")
+        user = User.objects.create_user("test")
+        user.user_permissions.add(Permission.objects.get(codename='view_country'))
+        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True)
         res = dgeq.evaluate()
         self.assertIn("code", res)
         self.assertEqual("UNKNOWN_FIELD", res["code"])

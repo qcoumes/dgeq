@@ -9,6 +9,7 @@ from django.db import models
 from django.http import QueryDict
 from django.utils.module_loading import import_string
 
+from .censor import Censor
 from .exceptions import (FieldDepthError, MAX_FOREIGN_FIELD_DEPTH, NotARelatedFieldError,
                          UnknownFieldError)
 
@@ -26,6 +27,9 @@ ForeignField = Union[
     models.ManyToManyField, models.ManyToManyRel
 ]
 
+# Type mapping a Model to a subset of its field
+FieldMapping = Dict[Type[models.Model], Iterable[str]]
+
 # Type corresponding to a Callable or a dotted path to a Callable with its
 # optional arguments
 ImportableCallable = Union[
@@ -37,20 +41,23 @@ ImportableCallable = Union[
     Tuple[str, Iterable[Any], Dict[str, Any]],  # Dotted path to a class with args and kwargs
 ]
 
+# Fields containing a list of Foreign Keys.
+MANY_FOREIGN_FIELD = (models.ManyToOneRel, models.ManyToManyField, models.ManyToManyRel)
+# Fields containing only one Foreign Key
+UNIQUE_FOREIGN_FIELD = (models.OneToOneRel, models.OneToOneField, models.ForeignKey)
 
 
-def _check_field(fields: List[str], current_model: Type[models.Model],
-                 arbitrary_fields: Iterable[str] = (),
-                 hidden_fields: Dict[Type[models.Model], Iterable[str]] = ()
-                 ) -> Tuple[models.Model, str]:
+
+def _check_field(fields: List[str], current_model: Type[models.Model], censor: Censor,
+                 arbitrary_fields: Iterable[str] = ()) -> Tuple[models.Model, str]:
     """Recursively check fields.
     
     Wrapped by `check_field()`, see `check_field()` docstring for more
     information."""
     token, subfields = fields[0], fields[1:]
     
-    if current_model in hidden_fields and token in hidden_fields[current_model]:
-        raise UnknownFieldError(current_model, token)
+    if censor.is_private(current_model, token):
+        raise UnknownFieldError(current_model, token, censor)
     
     try:
         # Will raise FieldDoesNotExists if `token` does not correspond to a
@@ -68,22 +75,21 @@ def _check_field(fields: List[str], current_model: Type[models.Model],
         # to the next one, checking if the field correspond to a remote field
         if subfields:
             if getattr(field, "remote_field", None) is None:
-                raise NotARelatedFieldError(current_model, token)
+                raise NotARelatedFieldError(current_model, token, censor)
             current_model = field.remote_field.model
     except FieldDoesNotExist:
-        raise UnknownFieldError(current_model, token)
+        raise UnknownFieldError(current_model, token, censor)
     
     # Recursively check subfields, if any
     if subfields:
-        return _check_field(subfields, current_model, hidden_fields=hidden_fields)
+        return _check_field(subfields, current_model, censor)
     
     return current_model, token
 
 
 
-def check_field(field: str, model: Type[models.Model], arbitrary_fields: Iterable[str] = (),
-                hidden_fields: Dict[Type[models.Model], Iterable[str]] = (), sep="."
-                ) -> Tuple[models.Model, str]:
+def check_field(field: str, model: Type[models.Model], censor: Censor,
+                arbitrary_fields: Iterable[str] = (), sep=".") -> Tuple[models.Model, str]:
     """Recursively check that a field exists foreign field.
     
     `arbitrary_fields` can be a list of string indicating arbitrary field added
@@ -114,11 +120,12 @@ def check_field(field: str, model: Type[models.Model], arbitrary_fields: Iterabl
     if len(field_list) >= max_depth:
         raise FieldDepthError(field)
     
-    return _check_field(field_list, model, arbitrary_fields, hidden_fields)
+    return _check_field(field_list, model, censor, arbitrary_fields)
 
 
 
-def get_field(field: str, model: Type[models.Model], sep=".") -> Union[models.Field, ForeignField]:
+def get_field(field: str, model: Type[models.Model], censor: Censor,
+              sep=".") -> Union[models.Field, ForeignField]:
     """Return the instance of `models.Field` corresponding to `field` inside
     `model`.
     
@@ -129,7 +136,7 @@ def get_field(field: str, model: Type[models.Model], sep=".") -> Union[models.Fi
     
     May raise the same exceptions as `check_field()`.
     """
-    second_last_model, last_field_name = check_field(field, model, sep=sep)
+    second_last_model, last_field_name = check_field(field, model, censor, sep=sep)
     return second_last_model._meta.get_field(last_field_name)
 
 
@@ -161,7 +168,7 @@ def import_callable(o: ImportableCallable) -> Callable:
     >>> import_callable("functools.reduce")
     <built-in function reduce>
     >>> class Dummy:
-    ...     def __init__(self, *args, **kwargs):
+    ...     def __init__(self, *args, **kwargs):  # noqa
     ...             self.args, self.kwargs = args, kwargs
     ...     def __call__(self):
     ...             print(self.args, self.kwargs)
@@ -276,6 +283,5 @@ def split_list_strings(lst: Iterable[str], sep: str) -> List[str]:
     delimiter.
     
     >>> split_list_strings(["one,two", "three", "four,five,six"], ",")
-    ['one', 'two', 'three', 'four', 'five', 'six']
-    """
+    ['one', 'two', 'three', 'four', 'five', 'six']"""
     return reduce(operator.add, (i.split(sep) for i in lst)) if lst else []

@@ -7,7 +7,7 @@ from . import utils
 from .aggregations import Aggregation, Annotation
 from .exceptions import InvalidCommandError
 from .filter import Filter
-from .joins import JoinQuery, MANY_FOREIGN_FIELD, UNIQUE_FOREIGN_FIELD
+from .joins import JoinQuery
 
 
 if TYPE_CHECKING:
@@ -65,7 +65,7 @@ class ComputeAnnotation:
         
         for a in annotations:
             a = Annotation.from_query_value(
-                a, query.model, query.case, query.arbitrary_fields
+                a, query.model, query.case, query.censor, query.arbitrary_fields
             )
             query.annotations.append(a)
             query.arbitrary_fields.add(a.to)
@@ -113,7 +113,7 @@ class Aggregate:
         aggregations = utils.split_list_strings(query_dict.getlist("c:aggregate"), ",")
         aggregations = [
             Aggregation.from_query_value(
-                a, query.model, query.arbitrary_fields, query.hidden_fields
+                a, query.model, query.censor, query.arbitrary_fields
             ).get()
             for a in aggregations
         ]
@@ -195,7 +195,7 @@ class Evaluate:
         # Choose field in the rows according to `c:show` and `c:hide`
         fields = set(query.fields)
         fields |= query.arbitrary_fields
-        fields -= set(query.hidden_fields.get(query.model, set()))
+        fields = query.censor.censor(query.model, fields)
         # Separating fields containing a FK, a list of FK, and the others
         unique_foreign_field = set()
         many_foreign_fields = set()
@@ -203,10 +203,10 @@ class Evaluate:
             if field_name in query.arbitrary_fields:
                 continue
             field = query.model._meta.get_field(field_name)  # noqa
-            if isinstance(field, UNIQUE_FOREIGN_FIELD):
+            if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
                 fields.discard(field_name)
                 unique_foreign_field.add(field_name)
-            elif isinstance(field, MANY_FOREIGN_FIELD):
+            elif isinstance(field, utils.MANY_FOREIGN_FIELD):
                 fields.discard(field_name)
                 many_foreign_fields.add(field_name)
         
@@ -303,12 +303,12 @@ class Filtering:
     def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
         for field, l in [i for i in query_dict.lists()]:
             values = utils.split_list_strings(l, ",")
-            filters = [
-                Filter(
-                    field, v, query.case, query.model, query.arbitrary_fields, query.hidden_fields
-                )
-                for v in values
-            ]
+            
+            filters = list()
+            for v in values:
+                utils.check_field(field, query.model, query.censor, query.arbitrary_fields)
+                filters.append(Filter(field, v, query.case))
+            
             for f in filters:
                 query.queryset = f.apply(query.queryset)
 
@@ -352,7 +352,7 @@ class Join:
         query_joins = dict()
         for j in joins:
             j = JoinQuery.from_query_value(
-                j, query.model, query.case, query.arbitrary_fields, query.hidden_fields
+                j, query.model, query.case, query.censor, query.arbitrary_fields,
             )
             query_joins[j.field] = j
         
@@ -362,7 +362,7 @@ class Join:
         )
         
         for field, join in sorted_query_join:
-            query.add_join(field, join, query.model)
+            query.add_join(field, join, query.model, query.censor)
         
         # Prefetch joins
         for j in query.joins.values():
@@ -384,13 +384,13 @@ class Show:
         show = utils.split_list_strings(query_dict.getlist("c:show"), ",")
         if show:
             for f in show:
-                utils.check_field(f, query.model, query.arbitrary_fields, query.hidden_fields)
+                utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
             query.fields = set(show)
             return
         
         hide = utils.split_list_strings(query_dict.getlist("c:hide"), ",")
         for f in hide:
-            utils.check_field(f, query.model, query.arbitrary_fields, query.hidden_fields)
+            utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
         query.fields |= set(query.arbitrary_fields)
         query.fields -= set(hide)
 
@@ -413,8 +413,8 @@ class Sort:
         
         for f in fields:
             utils.check_field(
-                f if not f.startswith("-") else f[1:], query.model, query.arbitrary_fields,
-                query.hidden_fields
+                f if not f.startswith("-") else f[1:], query.model, query.censor,
+                query.arbitrary_fields
             )
         
         if fields:

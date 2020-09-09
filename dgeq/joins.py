@@ -5,18 +5,7 @@ from django.db import models
 from . import utils
 from .exceptions import InvalidCommandError, NotARelatedFieldError
 from .filter import Filter
-
-
-# Field used to make a relation with another Model
-FOREIGN_FIELDS = (
-    models.OneToOneField, models.OneToOneRel,
-    models.ForeignKey, models.ManyToOneRel,
-    models.ManyToManyField, models.ManyToManyRel
-)
-# Fields containing a list of Foreign Keys.
-MANY_FOREIGN_FIELD = (models.ManyToOneRel, models.ManyToManyField, models.ManyToManyRel)
-# Fields containing only one Foreign Key
-UNIQUE_FOREIGN_FIELD = (models.OneToOneRel, models.OneToOneField, models.ForeignKey)
+from .censor import Censor
 
 
 
@@ -40,13 +29,13 @@ class JoinMixin:
     def add_field(self, field_name):
         """Add this field to an existing join."""
         field = self.model._meta.get_field(field_name)
-        if isinstance(field, UNIQUE_FOREIGN_FIELD):
+        if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
             self.unique_foreign_field.add(field_name)
         else:
             self.many_foreign_fields.add(field_name)
     
     
-    def add_join(self, field: str, join: 'JoinMixin', model: Type[models.Model],
+    def add_join(self, field: str, join: 'JoinMixin', model: Type[models.Model], censor: Censor,
                  sep="__", field_start: str = ""):
         """Add a `Join` to this query.
         
@@ -63,13 +52,13 @@ class JoinMixin:
             # Create the intermediary `Join` if needed, only add the new field
             # otherwise
             if current not in self.joins:
-                target = utils.get_field(base_name, model, sep)
-                self.joins[current] = JoinQuery(target, base_name, [field_name])
+                target = utils.get_field(base_name, model, censor, sep)
+                self.joins[current] = JoinQuery(target, base_name, censor, [field_name])
             else:
                 self.joins[current].add_field(field_name)
             
             # Recursively add the join
-            self.joins[current].add_join(remains, join, model, sep, base_name + sep)
+            self.joins[current].add_join(remains, join, model, censor, sep, base_name + sep)
         
         else:
             self.joins[field] = join
@@ -97,10 +86,9 @@ class JoinQuery(JoinMixin):
     many: bool
     
     
-    def __init__(self, target: utils.ForeignField, field: str, show: Iterable[str] = (),
-                 hide: Iterable[str] = (), start: int = 0, limit: int = 0, sort: Iterable[str] = (),
-                 filters: Iterable[Filter] = (),
-                 hidden_fields: Dict[Type[models.Model], Iterable[str]] = None):
+    def __init__(self, target: utils.ForeignField, field: str, censor: Censor,
+                 show: Iterable[str] = (), hide: Iterable[str] = (), sort: Iterable[str] = (),
+                 filters: Iterable[Filter] = (), start: int = 0, limit: int = 0, ):
         super().__init__()
         
         self.model = target.related_model
@@ -109,36 +97,33 @@ class JoinQuery(JoinMixin):
         self.limit = limit
         self.sort = sort
         self.filters = filters
-        self.many = isinstance(target, MANY_FOREIGN_FIELD)
+        self.many = isinstance(target, utils.MANY_FOREIGN_FIELD)
         
-        hidden_fields = hidden_fields or dict()
-        hidden_fields = hidden_fields.get(self.model, set())
         target_model = target.related_model
         if show:
-            self.fields = set(show)
+            fields = set(show)
         else:
-            self.fields = {f.name for f in target_model._meta.get_fields()}
-            self.fields -= set(hide)
-        self.fields -= set(hidden_fields)
+            fields = {f.name for f in target_model._meta.get_fields()}  # noqa
+            fields -= set(hide)
+        fields = censor.censor(self.model, fields)
         
+        self.fields = fields
         # Separating unique and many related fields
         self.unique_foreign_field = set()
         self.many_foreign_fields = set()
-        for field_name in [f for f in self.fields if f not in hidden_fields]:
+        for field_name in list(self.fields):
             field = target_model._meta.get_field(field_name)  # noqa
-            if isinstance(field, UNIQUE_FOREIGN_FIELD):
+            if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
                 self.fields.discard(field_name)
                 self.unique_foreign_field.add(field_name)
-            elif isinstance(field, MANY_FOREIGN_FIELD):
+            elif isinstance(field, utils.MANY_FOREIGN_FIELD):
                 self.fields.discard(field_name)
                 self.many_foreign_fields.add(field_name)
     
     
     @classmethod
-    def from_query_value(cls, value: str, model: Type[models.Model], case: bool,
-                         arbitrary_fields: Iterable[str] = (),
-                         hidden_fields: Dict[Type[models.Model], Iterable[str]] = dict()
-                         ) -> 'JoinQuery':
+    def from_query_value(cls, value: str, model: Type[models.Model], case: bool, censor: Censor,
+                         arbitrary_fields: Iterable[str] = ()) -> 'JoinQuery':
         """Create a `JoinQuery` from a 'c:join` query string."""
         try:
             query_dict = utils.subquery_to_querydict(value)
@@ -149,20 +134,20 @@ class JoinQuery(JoinMixin):
         if "field" not in query_dict:
             raise InvalidCommandError("c:join", "'field' argument is missing")
         second_last_model, last_field_name = utils.check_field(
-            query_dict["field"], model, arbitrary_fields, hidden_fields
+            query_dict["field"], model, censor, arbitrary_fields
         )
         field = second_last_model._meta.get_field(last_field_name)
-        if not isinstance(field, FOREIGN_FIELDS):
-            raise NotARelatedFieldError(second_last_model, query_dict['field'])
+        if getattr(field, "remote_field", None) is None:
+            raise NotARelatedFieldError(second_last_model, query_dict['field'], censor)
         target = field
         target_model = target.related_model
         field_name = query_dict["field"].replace(".", "__")
         
         # Retrieve show & hide:
         show = [f for f in utils.split_list_strings(query_dict.getlist("show"), "'")]
-        [utils.check_field(f, target_model, arbitrary_fields, hidden_fields) for f in show]
+        [utils.check_field(f, target_model, censor, arbitrary_fields) for f in show]
         hide = [f for f in utils.split_list_strings(query_dict.getlist("hide"), "'")]
-        [utils.check_field(f, target_model, arbitrary_fields, hidden_fields) for f in hide]
+        [utils.check_field(f, target_model, censor, arbitrary_fields) for f in hide]
         
         # Retrieve start & limit:
         if not (start := query_dict.get("start", "0")).isdigit():
@@ -179,8 +164,7 @@ class JoinQuery(JoinMixin):
         sort = utils.split_list_strings(query_dict.getlist("sort"), "'")
         for f in sort:
             utils.check_field(
-                (f if not f.startswith("-") else f[1:]), target_model, arbitrary_fields,
-                hidden_fields
+                (f if not f.startswith("-") else f[1:]), target_model, censor, arbitrary_fields
             )
         
         # Retrieve filters
@@ -192,9 +176,10 @@ class JoinQuery(JoinMixin):
                     "c:join", f"Filters must contains an equal '=', received '{kwarg[0]}'"
                 )
             k, v = kwarg
-            filters.append(Filter(k, v, case, target_model, hidden_fields))
+            utils.check_field(k, target_model, censor, arbitrary_fields)
+            filters.append(Filter(k, v, case))
         
-        return cls(target, field_name, show, hide, start, limit, sort, filters, hidden_fields)
+        return cls(target, field_name, censor, show, hide, sort, filters, start, limit)
     
     
     def prefetch(self, queryset: models.QuerySet) -> models.QuerySet:

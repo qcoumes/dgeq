@@ -1,11 +1,13 @@
 from functools import reduce
 
+from django.contrib.auth.models import AnonymousUser
 from django.http import QueryDict
 from django.test import TestCase
-from django_dummy_app.models import Country, River
 
 from dgeq import utils
 from dgeq.exceptions import FieldDepthError, MAX_FOREIGN_FIELD_DEPTH, NotARelatedFieldError, UnknownFieldError
+from dgeq.utils import Censor
+from django_dummy_app.models import Country, River
 
 
 
@@ -24,60 +26,66 @@ class CheckFieldTestCase(TestCase):
     fixtures = ["tests/django_dummy_app/geography_data.json"]
     
     
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = AnonymousUser()
+        cls.censor = Censor(cls.user)
+    
+    
     def test_model(self):
-        model, field = utils.check_field("name", Country)
+        model, field = utils.check_field("name", Country, self.censor)
         self.assertEqual(Country, model)
         self.assertEqual("name", field)
     
     
     def test_model_related(self):
-        model, field = utils.check_field("rivers.length", Country)
+        model, field = utils.check_field("rivers.length", Country, self.censor)
         self.assertEqual(River, model)
         self.assertEqual("length", field)
     
     
     def test_model_related_loop(self):
-        model, field = utils.check_field("rivers.countries.name", Country)
+        model, field = utils.check_field("rivers.countries.name", Country, self.censor)
         self.assertEqual(Country, model)
         self.assertEqual("name", field)
     
     
     def test_in_arbitrary_field(self):
-        model, field = utils.check_field("arbitrary", Country, ["arbitrary"])
+        model, field = utils.check_field("arbitrary", Country, self.censor, ["arbitrary"])
         self.assertEqual(Country, model)
         self.assertEqual("arbitrary", field)
     
     
     def test_not_in_arbitrary_field(self):
-        model, field = utils.check_field("name", Country, ["arbitrary"])
+        model, field = utils.check_field("name", Country, self.censor, ["arbitrary"])
         self.assertEqual(Country, model)
         self.assertEqual("name", field)
     
     
     def test_not_a_related_field(self):
         with self.assertRaises(NotARelatedFieldError):
-            utils.check_field("name.other", Country)
+            utils.check_field("name.other", Country, self.censor)
     
     
     def test_max_depth_exceeded(self):
         with self.assertRaises(FieldDepthError):
             field = "rivers.countries" + (".rivers.countries" * (MAX_FOREIGN_FIELD_DEPTH // 2))
-            utils.check_field(field, Country)
+            utils.check_field(field, Country, self.censor)
     
     
     def test_unknown_field_model(self):
         with self.assertRaises(UnknownFieldError):
-            utils.check_field("unknown", Country)
+            utils.check_field("unknown", Country, self.censor)
     
     
     def test_unknown_field_model_related(self):
         with self.assertRaises(UnknownFieldError):
-            utils.check_field("rivers.unknown", Country)
+            utils.check_field("rivers.unknown", Country, self.censor)
     
     
     def test_unknown_field_model_related_loop(self):
         with self.assertRaises(UnknownFieldError):
-            utils.check_field("rivers.countries.unknown", Country)
+            utils.check_field("rivers.countries.unknown", Country, self.censor)
 
 
 
@@ -85,23 +93,28 @@ class GetFieldTestCase(TestCase):
     fixtures = ["tests/django_dummy_app/geography_data.json"]
     
     
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = AnonymousUser()
+        cls.censor = Censor(cls.user)
+    
     def test_field(self):
-        field = utils.get_field("name", Country)
+        field = utils.get_field("name", Country, self.censor)
         self.assertEqual(Country._meta.get_field("name"), field)
     
     
     def test_foreign_field(self):
-        field = utils.get_field("rivers", Country)
+        field = utils.get_field("rivers", Country, self.censor)
         self.assertEqual(Country._meta.get_field("rivers"), field)
     
     
     def test_field_related(self):
-        field = utils.get_field("rivers.length", Country)
+        field = utils.get_field("rivers.length", Country, self.censor)
         self.assertEqual(River._meta.get_field("length"), field)
     
     
     def test_foreign_field_related(self):
-        field = utils.get_field("rivers.countries", Country)
+        field = utils.get_field("rivers.countries", Country, self.censor)
         self.assertEqual(River._meta.get_field("countries"), field)
 
 

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### 0.2.0
+
+* Now can allow only specific field for each Model, or can use django's permission system
+
 #### 0.1.1 & 0.1.2
 
 * Added missing MANIFEST.in

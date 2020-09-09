@@ -8,6 +8,7 @@ from django.db.models import QuerySet
 from . import utils
 from .exceptions import InvalidCommandError, UnknownFieldError
 from .filter import Filter
+from .censor import Censor
 
 
 # Function used in aggregation and annotation. New entry can be added by with
@@ -50,14 +51,9 @@ class Aggregation:
     
     
     @classmethod
-    def from_query_value(cls, value: str, model: Type[models.Model],
-                         arbitrary_fields: Iterable[str] = (),
-                         hidden_fields: Dict[Type[models.Model], Iterable[str]] = None
-                         ) -> 'Aggregation':
+    def from_query_value(cls, value: str, model: Type[models.Model], censor: Censor,
+                         arbitrary_fields: Iterable[str] = ()) -> 'Aggregation':
         """Create an `Aggregation` from a 'c:aggregate` query string."""
-        if hidden_fields is None:
-            hidden_fields = dict()
-        
         try:
             query_dict = utils.subquery_to_querydict(value)
         except ValueError as e:
@@ -66,7 +62,7 @@ class Aggregation:
         # Retrieve the field used to compute the aggregation
         if "field" not in query_dict:
             raise InvalidCommandError("c:aggregate", "'field' argument is missing")
-        utils.check_field(query_dict["field"], model, arbitrary_fields, hidden_fields)
+        utils.check_field(query_dict["field"], model, censor, arbitrary_fields)
         field = query_dict["field"].replace(".", "__")
         
         # Retrieve the function used to compute the aggregation
@@ -93,10 +89,9 @@ class Aggregation:
         try:
             # Use check_fields to check that a field DOES NOT exists by
             # expecting the exception it raises.
-            utils.check_field(query_dict["to"], model, arbitrary_fields, hidden_fields)
+            utils.check_field(query_dict["to"], model, censor, arbitrary_fields)
             raise InvalidCommandError(
-                "c:aggregate",
-                f"'to' value ('{query_dict['to']}') is a already used by a field"
+                "c:aggregate", f"'to' value ('{query_dict['to']}') is a already used by a field"
             )
         except UnknownFieldError:
             pass
@@ -155,14 +150,9 @@ class Annotation:
     
     
     @classmethod
-    def from_query_value(cls, value: str, model: Type[models.Model], case: bool,
-                         arbitrary_fields: Iterable[str] = (),
-                         hidden_fields: Dict[Type[models.Model], Iterable[str]] = None
-                         ) -> 'Annotation':
+    def from_query_value(cls, value: str, model: Type[models.Model], case: bool, censor: Censor,
+                         arbitrary_fields: Iterable[str] = ()) -> 'Annotation':
         """Create an `Annotation` from a 'c:annotate` query string."""
-        if hidden_fields is None:
-            hidden_fields = dict()
-        
         try:
             query_dict = utils.subquery_to_querydict(value)
         except ValueError as e:
@@ -171,7 +161,7 @@ class Annotation:
         # Retrieve the field used to compute the annotation
         if "field" not in query_dict:
             raise InvalidCommandError("c:annotate", "'field' argument is missing")
-        utils.check_field(query_dict["field"], model, arbitrary_fields, hidden_fields)
+        utils.check_field(query_dict["field"], model, censor, arbitrary_fields)
         field = query_dict["field"].replace(".", "__")
         
         # Retrieve the function used to compute the annotation
@@ -198,7 +188,7 @@ class Annotation:
         try:
             # Use check_fields to check that a field DOES NOT exists by
             # expecting the exception it raises.
-            utils.check_field(query_dict["to"], model, arbitrary_fields, hidden_fields)
+            utils.check_field(query_dict["to"], model, censor, arbitrary_fields)
             raise InvalidCommandError(
                 "c:annotate", f"'to' value ('{query_dict['to']}') is a already used by a field"
             )
@@ -215,7 +205,7 @@ class Annotation:
                     "c:annotate", f"Filters must contains an equal '=', received '{kwarg[0]}'"
                 )
             k, v = kwarg
-            filters.append(Filter(k, v, case, model, hidden_fields))
+            filters.append(Filter(k, v, case))
         
         # Check if this annotation must be delayed
         if not (early := query_dict.get("early", "0")) in ["0", "1"]:

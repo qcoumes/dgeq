@@ -1,13 +1,11 @@
 from datetime import datetime
-from typing import Dict, Iterable, Type
 
 from django.conf import settings
-from django.db import models
 from django.db.models import Q, QuerySet
 
 from . import types
 from .exceptions import SearchModifierError
-from .utils import check_field, import_callable
+from .utils import import_callable
 
 
 # Parsers for query string values. The whole list can be redefined with the
@@ -89,20 +87,13 @@ class Filter:
     """Represent a search filter in a `GenericQuery`"""
     
     
-    def __init__(self, field: str, value: str, case: bool, model: Type[models.Model],
-                 arbitrary_fields: Iterable[str] = (),
-                 hidden_fields: Dict[Type[models.Model], Iterable[str]] = None):
+    def __init__(self, field: str, value: str, case: bool):
         """Create a `Filter` from field-value pair of a query string.
         
         `case` indicate whether the filter is case-sensitive (`True`) or not.
         
         `value` must include the search modifier, if any.
         """
-        if hidden_fields is None:
-            hidden_fields = dict()
-        
-        check_field(field, model, arbitrary_fields, hidden_fields)
-        
         # Extract optional modifier from value, if any
         if value and value[0] in SEARCH_MODIFIERS:
             modifier, value = value[0], value[1:]

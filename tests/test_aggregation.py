@@ -1,17 +1,25 @@
+from django.contrib.auth.models import AnonymousUser
 from django.db import models
 from django.db.models import Q
 from django.test import TestCase
-from django_dummy_app.models import Country
 
 from dgeq import utils
 from dgeq.aggregations import Aggregation, Annotation
 from dgeq.exceptions import InvalidCommandError
 from dgeq.filter import Filter
+from dgeq.utils import Censor
+from django_dummy_app.models import Country
 
 
 
 class AggregationTestCase(TestCase):
     fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = AnonymousUser()
+        cls.censor = Censor(cls.user)
     
     
     def test_functions(self):
@@ -44,7 +52,7 @@ class AggregationTestCase(TestCase):
             "field=population|func=min|to=population_min"
         )
         aggregations = utils.split_list_strings([query_string], ",")
-        aggregations = [Aggregation.from_query_value(a, Country) for a in aggregations]
+        aggregations = [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
         aggregations = [a.get() for a in aggregations]
         kwargs = dict(aggregations)
         query = Country.objects.all().aggregate(**kwargs)
@@ -61,7 +69,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_missing_func(self):
@@ -69,7 +77,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_unknown_func(self):
@@ -77,7 +85,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_missing_field(self):
@@ -85,7 +93,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_missing_to(self):
@@ -93,7 +101,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_already_use_to(self):
@@ -101,7 +109,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
     
     
     def test_invalid_to(self):
@@ -109,7 +117,7 @@ class AggregationTestCase(TestCase):
         aggregations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Aggregation.from_query_value(a, Country) for a in aggregations]
+            [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
 
 
 
@@ -117,11 +125,16 @@ class AnnotationTestCase(TestCase):
     fixtures = ["tests/django_dummy_app/geography_data.json"]
     
     
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = AnonymousUser()
+        cls.censor = Censor(cls.user)
+    
+    
     def test_functions(self):
         attributes = [
             "rivers_length_max", "rivers_length_min", "rivers_length_avg", "rivers_length_sum",
-            "rivers_length_cnt",
-            # "rivers_length_stddev", "rivers_length_var"
+            "rivers_length_cnt", # "rivers_length_stddev", "rivers_length_var"
         ]
         annotations = [
             Annotation("rivers__length", "rivers_length_max", models.Max),
@@ -156,7 +169,7 @@ class AnnotationTestCase(TestCase):
     
     
     def test_filters(self):
-        filters = [Filter("rivers.length", ">2000", False, Country)]
+        filters = [Filter("rivers.length", ">2000", False)]
         annotations = [Annotation("rivers__length", "rivers_length_count", models.Count, filters)]
         query = Country.objects.all()
         for a in annotations:
@@ -247,7 +260,7 @@ class AnnotationTestCase(TestCase):
             "field=population|func=min|to=population_min|filters=rivers.length=<1500|early=0"
         )
         annotations = utils.split_list_strings([query_string], ",")
-        annotations = [Annotation.from_query_value(a, Country, False) for a in annotations]
+        annotations = [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
         query = Country.objects.all()
         for a in annotations:
             query = a.apply(query)
@@ -271,7 +284,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_missing_func(self):
@@ -279,7 +292,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_unknown_func(self):
@@ -287,7 +300,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_missing_field(self):
@@ -295,7 +308,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_missing_to(self):
@@ -303,7 +316,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_already_use_to(self):
@@ -311,7 +324,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_invalid_to(self):
@@ -319,7 +332,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_invalid_filter(self):
@@ -327,7 +340,7 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
     
     
     def test_invalid_early(self):
@@ -337,4 +350,4 @@ class AnnotationTestCase(TestCase):
         annotations = utils.split_list_strings([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
-            [Annotation.from_query_value(a, Country, False) for a in annotations]
+            [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]

@@ -1,8 +1,10 @@
+import logging
 import re
 import time
-from typing import Dict, Iterable, Optional, Set, Type, Union
+from typing import Dict, Optional, Set, Type, Union
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser, User
 from django.db import models
 from django.db.models import QuerySet
 from django.http import QueryDict
@@ -10,8 +12,11 @@ from django.http import QueryDict
 from . import commands
 from .exceptions import DgeqError
 from .joins import JoinMixin, JoinQuery
-from .utils import import_callable
+from .censor import Censor
+from .utils import FieldMapping, import_callable
 
+
+logger = logging.getLogger(__file__)
 
 # List of commands used to construct the queryset. They are all called in the
 # given order when calling the method `prepare()` and `evaluate()` of
@@ -35,6 +40,8 @@ DEFAULT_COMMANDS = [
 DGEQ_COMMANDS = [
     import_callable(p) for p in getattr(settings, "DGEQ_COMMANDS", DEFAULT_COMMANDS)
 ]
+
+QueryDictType = Union[QueryDict, Type[QueryDict]]
 
 
 
@@ -67,25 +74,26 @@ class GenericQuery(JoinMixin):
     time: float
     joins: Dict[str, JoinQuery]
     related: bool
-    hidden_fields: Dict[Type[models.Model], Set[str]]
+    private_fields: Dict[Type[models.Model], Set[str]]
     
     
-    def __init__(self, model: Type[models.Model], query_dict: Union[QueryDict, Type[QueryDict]],
-                 hidden_fields: Dict[Type[models.Model], Iterable[str]] = None):
+    def __init__(self, user: Union[User, AnonymousUser], model: Type[models.Model],
+                 query_dict: QueryDictType, public_fields: FieldMapping = None,
+                 private_fields: FieldMapping = None, use_permissions: bool = False):
         super().__init__()
         
         self._query_dict = query_dict
         self._step = 0
         
         self.model = model
+        self.censor = Censor(user, public_fields, private_fields, use_permissions)
         self.case = True
         self.fields = {f.name for f in model._meta.get_fields()}  # noqa
         self.arbitrary_fields = set()
         self.time = time.time()
         self.result = {'status': True}
         self.related = True
-        self.hidden_fields = hidden_fields or dict()
-        
+        self.private_fields = private_fields or dict()
         self.queryset = self.model.objects.all()
     
     
@@ -126,6 +134,7 @@ class GenericQuery(JoinMixin):
             }
         
         except Exception as e:  # pragma: no cover
+            logger.warning("Unknown error in dgeq:", exc_info=True)
             result = {
                 "status":  False,
                 "message": str(e),
