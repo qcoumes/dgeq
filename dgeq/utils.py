@@ -1,9 +1,10 @@
 import operator
 from collections import abc
 from functools import reduce
-from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Set, Tuple, Type, Union
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.http import QueryDict
@@ -285,3 +286,87 @@ def split_list_strings(lst: Iterable[str], sep: str) -> List[str]:
     >>> split_list_strings(["one,two", "three", "four,five,six"], ",")
     ['one', 'two', 'three', 'four', 'five', 'six']"""
     return reduce(operator.add, (i.split(sep) for i in lst)) if lst else []
+
+
+
+def split_related_field(model: Type[models.Model], fields: Iterable[str],
+                        arbitrary_fields: Iterable[str] = ()
+                        ) -> Tuple[Set[str], Set[str], Set[str]]:
+    """Split the given `fields` of `model` into a tuple of iterables
+    `(fields, one_fields, many_fields)`.
+    
+    `one_fields` contains fields that are either `ForeignKey`, `OneToOneField`
+    or `OneToOneRel`.
+    `many_fields` contains fields that are either `ManyToManyField`,
+    `ManyToManyRel` or `ManyToOneRel`.
+    `fields` contains all other fields.
+    
+    `arbitrary_fields` must be an iterable of the arbitrary fields added by
+    `QuerySet`'s method like `annotation()`."""
+    set_fields = set(fields)
+    one_fields = set()
+    many_fields = set()
+    
+    for field_name in list(set_fields):
+        if field_name in arbitrary_fields:
+            continue
+        field = model._meta.get_field(field_name)  # noqa
+        if isinstance(field, UNIQUE_FOREIGN_FIELD):
+            set_fields.discard(field_name)
+            one_fields.add(field_name)
+        elif isinstance(field, MANY_FOREIGN_FIELD):
+            set_fields.discard(field_name)
+            many_fields.add(field_name)
+    
+    return set_fields, one_fields, many_fields
+
+
+
+def serialize_row(instance: models.Model, fields: Iterable[str] = (),
+                  one_fields: Iterable[str] = (), many_fields: Iterable[str] = (),
+                  joins: Dict = None) -> Dict[str, Any]:
+    """Serialize an `instance` of `models.Model` according to the given fields
+    and joins.
+    
+    See `split_related_field()` for the different field definition."""
+    if joins is None:
+        joins = dict()
+    
+    row = {f: getattr(instance, f) for f in fields}
+    
+    for f in one_fields:
+        if f in joins.keys():
+            row[f] = joins[f].fetch(instance)
+        else:
+            row[f] = getattr(instance, f).pk
+    
+    for f in many_fields:
+        if f in joins.keys():
+            row[f] = joins[f].fetch(instance)
+        else:
+            row[f] = list(map(lambda o: o.pk, getattr(instance, f).all()))
+    
+    return row
+
+
+
+def serialize(user: [User, AnonymousUser], instance: models.Model,
+              public_fields: FieldMapping = None, private_fields: FieldMapping = None,
+              use_permissions: bool = False) -> Dict[str, Any]:
+    """Serialize an `instance` the same way `dgeq.GenericQuery` would serialize
+    a row."""
+    model = instance.__class__
+    include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
+    fields = [
+        f.name for f in model._meta.get_fields(include_hidden=include_hidden)
+    ]
+    fields = Censor(user, public_fields, private_fields, use_permissions).censor(model, fields)
+    fields, one_fields, many_fields = split_related_field(model, fields)
+    
+    row = {f: getattr(instance, f) for f in fields}
+    for f in one_fields:
+        row[f] = getattr(instance, f).pk
+    for f in many_fields:
+        row[f] = list(map(lambda o: o.pk, getattr(instance, f).all()))
+    
+    return row

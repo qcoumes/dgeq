@@ -1,3 +1,4 @@
 from .dgeq import GenericQuery
+from .utils import serialize
 
-VERSION = __version__ = "0.2.0"
+VERSION = __version__ = "0.2.1"

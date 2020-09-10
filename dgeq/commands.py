@@ -192,52 +192,24 @@ class Evaluate:
         if not int(b):
             return
         
-        # Choose field in the rows according to `c:show` and `c:hide`
         fields = set(query.fields)
         fields |= query.arbitrary_fields
         fields = query.censor.censor(query.model, fields)
-        # Separating fields containing a FK, a list of FK, and the others
-        unique_foreign_field = set()
-        many_foreign_fields = set()
-        for field_name in list(fields):
-            if field_name in query.arbitrary_fields:
-                continue
-            field = query.model._meta.get_field(field_name)  # noqa
-            if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
-                fields.discard(field_name)
-                unique_foreign_field.add(field_name)
-            elif isinstance(field, utils.MANY_FOREIGN_FIELD):
-                fields.discard(field_name)
-                many_foreign_fields.add(field_name)
         
-        # Building rows
+        fields, one_fields, many_fields = utils.split_related_field(
+            query.model, fields, query.arbitrary_fields
+        )
         joins: Dict[str, JoinQuery] = getattr(query, "joins", dict())
-        rows = list()
-        joins_keys = joins.keys()
         queryset = query.queryset.select_related(
-            *[f for f in unique_foreign_field if f not in joins_keys]
+            *[f for f in one_fields if f not in joins.keys()]
         )
         queryset = queryset.prefetch_related(
-            *[f for f in many_foreign_fields if f not in joins_keys]
+            *[f for f in many_fields if f not in joins.keys()]
         )
         
+        rows = list()
         for item in queryset:
-            row = {f: getattr(item, f) for f in fields}
-            
-            if query.related:
-                for f in unique_foreign_field:
-                    if f in joins_keys:
-                        row[f] = joins[f].fetch(item)
-                    else:
-                        row[f] = getattr(item, f).pk
-                
-                for f in many_foreign_fields:
-                    if f in joins_keys:
-                        row[f] = joins[f].fetch(item)
-                    else:
-                        row[f] = list(map(lambda o: o.pk, getattr(item, f).all()))
-            
-            rows.append(row)
+            rows.append(utils.serialize_row(item, fields, one_fields, many_fields, joins))
         
         query.result["rows"] = rows
 

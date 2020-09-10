@@ -1,11 +1,13 @@
+import operator
+from functools import reduce
 from typing import Dict, Iterable, List, Set, Type, Union
 
 from django.db import models
 
 from . import utils
+from .censor import Censor
 from .exceptions import InvalidCommandError, NotARelatedFieldError
 from .filter import Filter
-from .censor import Censor
 
 
 
@@ -14,25 +16,25 @@ class JoinMixin:
     
     joins: Dict[str, 'JoinMixin']
     fields: Set[str]
-    unique_foreign_field: Set[str]
-    many_foreign_fields: Set[str]
+    one_fields: Set[str]
+    many_fields: Set[str]
     model: Type[models.Model]
     
     
     def __init__(self):
         self.joins = dict()
         self.fields = set()
-        self.unique_foreign_field = set()
-        self.many_foreign_fields = set()
+        self.one_fields = set()
+        self.many_fields = set()
     
     
     def add_field(self, field_name):
         """Add this field to an existing join."""
         field = self.model._meta.get_field(field_name)
         if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
-            self.unique_foreign_field.add(field_name)
+            self.one_fields.add(field_name)
         else:
-            self.many_foreign_fields.add(field_name)
+            self.many_fields.add(field_name)
     
     
     def add_join(self, field: str, join: 'JoinMixin', model: Type[models.Model], censor: Censor,
@@ -81,8 +83,8 @@ class JoinQuery(JoinMixin):
     model: Type[models.Model]
     joins: Dict[str, 'JoinQuery']
     fields: Set[str]
-    unique_foreign_field: Set[str]
-    many_foreign_fields: Set[str]
+    one_fields: Set[str]
+    many_fields: Set[str]
     many: bool
     
     
@@ -109,16 +111,16 @@ class JoinQuery(JoinMixin):
         
         self.fields = fields
         # Separating unique and many related fields
-        self.unique_foreign_field = set()
-        self.many_foreign_fields = set()
+        self.one_fields = set()
+        self.many_fields = set()
         for field_name in list(self.fields):
             field = target_model._meta.get_field(field_name)  # noqa
             if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
                 self.fields.discard(field_name)
-                self.unique_foreign_field.add(field_name)
+                self.one_fields.add(field_name)
             elif isinstance(field, utils.MANY_FOREIGN_FIELD):
                 self.fields.discard(field_name)
-                self.many_foreign_fields.add(field_name)
+                self.many_fields.add(field_name)
     
     
     @classmethod
@@ -185,18 +187,19 @@ class JoinQuery(JoinMixin):
     def prefetch(self, queryset: models.QuerySet) -> models.QuerySet:
         """Recursively prefetch joins to speed up the database query."""
         subquery = self.model.objects.all()
-        
-        for f in self.filters:
-            subquery = f.apply(subquery)
+
+        if self.filters:
+            q = reduce(operator.and_, [f.get() for f in self.filters])
+            subquery = subquery.filter(q)
         
         if self.sort:
             subquery = subquery.order_by(*self.sort)
         
         subquery = subquery.select_related(
-            *[f for f in self.unique_foreign_field if f not in self.joins.keys()]
+            *[f for f in self.one_fields if f not in self.joins.keys()]
         )
         subquery = subquery.prefetch_related(
-            *[f for f in self.many_foreign_fields if f not in self.joins.keys()]
+            *[f for f in self.many_fields if f not in self.joins.keys()]
         )
         
         new = queryset.prefetch_related(models.Prefetch(self.field, queryset=subquery))
@@ -212,8 +215,9 @@ class JoinQuery(JoinMixin):
         field = self.field.split("__")[-1]
         subquery = getattr(obj, field).all()
         
-        for f in self.filters:
-            subquery = f.apply(subquery)
+        if self.filters:
+            q = reduce(operator.and_, [f.get() for f in self.filters])
+            subquery = subquery.filter(q)
         
         if self.sort:
             subquery = subquery.order_by(*self.sort)
@@ -225,21 +229,11 @@ class JoinQuery(JoinMixin):
         
         rows = list()
         for item in subquery:
-            row = {f: getattr(item, f) for f in self.fields}
-            
-            for f in self.unique_foreign_field:
-                if f in self.joins.keys():
-                    row[f] = self.joins[f].fetch(item)
-                else:
-                    row[f] = getattr(item, f).pk
-            
-            for f in self.many_foreign_fields:
-                if f in self.joins.keys():
-                    row[f] = self.joins[f].fetch(item)
-                else:
-                    row[f] = list(map(lambda o: o.pk, getattr(item, f).all()))
-            
+            row = utils.serialize_row(
+                item, self.fields, self.one_fields, self.many_fields, self.joins
+            )
             rows.append(row)
+        
         return rows
     
     
@@ -249,13 +243,13 @@ class JoinQuery(JoinMixin):
         
         row = {f: getattr(related, f) for f in self.fields}
         
-        for f in self.unique_foreign_field:
+        for f in self.one_fields:
             if f in self.joins.keys():
                 row[f] = self.joins[f].fetch(related)
             else:
                 row[f] = getattr(related, f).pk
         
-        for f in self.many_foreign_fields:
+        for f in self.many_fields:
             if f in self.joins.keys():
                 row[f] = self.joins[f].fetch(related)
             else:

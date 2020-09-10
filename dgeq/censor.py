@@ -2,7 +2,10 @@ from typing import Dict, Iterable, Type, Union
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import FieldDoesNotExist
 from django.db import models
+
+from dgeq.exceptions import UnknownFieldError
 
 
 
@@ -39,7 +42,10 @@ class Censor:
         """Return `True` if this `Model`'s `field` should be removed for the
         current user."""
         if self.use_permissions:
-            field_object = model._meta.get_field(field)
+            try:
+                field_object = model._meta.get_field(field)
+            except FieldDoesNotExist:
+                raise UnknownFieldError(model, field, self)
             if getattr(field_object, "remote_field", None) is not None:
                 content_type = ContentType.objects.get_for_model(field_object.remote_field.model)
                 if not self.user.has_perm(f"{content_type.app_label}.view_{content_type.model}"):

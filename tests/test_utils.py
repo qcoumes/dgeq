@@ -1,11 +1,12 @@
 from functools import reduce
 
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.http import QueryDict
 from django.test import TestCase
 
-from dgeq import utils
+from dgeq import GenericQuery, utils
 from dgeq.exceptions import FieldDepthError, MAX_FOREIGN_FIELD_DEPTH, NotARelatedFieldError, UnknownFieldError
+from dgeq.joins import JoinQuery
 from dgeq.utils import Censor
 from django_dummy_app.models import Country, River
 
@@ -97,6 +98,7 @@ class GetFieldTestCase(TestCase):
     def setUpTestData(cls):
         cls.user = AnonymousUser()
         cls.censor = Censor(cls.user)
+    
     
     def test_field(self):
         field = utils.get_field("name", Country, self.censor)
@@ -249,3 +251,86 @@ class SplitListStringTestCase(TestCase):
     def test(self):
         lst = utils.split_list_strings(["one,two", "three", "four,five,six"], ",")
         self.assertEqual(['one', 'two', 'three', 'four', 'five', 'six'], lst)
+
+
+
+class SerializeRowTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
+    
+    def test_serialize_row(self):
+        c = Country.objects.get(pk=1)
+        row = utils.serialize_row(
+            c, ["name", "population"], ["region"], ["rivers", "mountains"],
+            {
+                "rivers": JoinQuery.from_query_value(
+                    "field=rivers", Country, False, Censor(AnonymousUser())
+                )
+            }
+        )
+        expected = {
+            'name':       'Afghanistan',
+            'population': 36296100,
+            'region':     15,
+            'rivers':     [
+                {
+                    'length':    2620,
+                    'discharge': 1400,
+                    'id':        37,
+                    'name':      'Amu Darya–Panj',
+                    'countries': [1, 202, 211, 222]
+                },
+                {
+                    'length':    1130,
+                    'discharge': None,
+                    'id':        165,
+                    'name':      'Helmand',
+                    'countries': [1, 100]
+                }
+            ],
+            'mountains':  [
+                331, 332, 473, 475, 478, 500, 504, 506, 508, 535, 948, 1043,
+                1128, 1130, 1157
+            ]
+        }
+        self.assertEqual(expected, row)
+
+    def test_serialize_row_no_join(self):
+        c = Country.objects.get(pk=1)
+        row = utils.serialize_row(
+            c, ["name", "population"], ["region"], ["rivers", "mountains"]
+        )
+        expected = {
+            'name':       'Afghanistan',
+            'population': 36296100,
+            'region':     15,
+            'rivers':     [37, 165],
+            'mountains':  [
+                331, 332, 473, 475, 478, 500, 504, 506, 508, 535, 948, 1043,
+                1128, 1130, 1157
+            ]
+        }
+        self.assertEqual(expected, row)
+
+
+
+class SerializeTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
+    
+    def test_serialize(self):
+        c = Country.objects.get(pk=1)
+        query_dict = QueryDict("id=1")
+        user = User.objects.create_user("test")
+        user.user_permissions.add(Permission.objects.get(codename='view_country'))
+        user.user_permissions.add(Permission.objects.get(codename='view_region'))
+        user.user_permissions.add(Permission.objects.get(codename='view_river'))
+        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True, private_fields={
+            Country: ["area", "mountains"]
+        })
+        res = dgeq.evaluate()
+        row = utils.serialize(user, c, use_permissions=True, private_fields={
+            Country: ["area", "mountains"]
+        })
+        
+        self.assertEqual(res["rows"][0], row)

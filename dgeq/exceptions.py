@@ -68,7 +68,7 @@ class UnknownFieldError(DgeqError):
     
     def __str__(self):
         return (
-            f"Unknown field '{self.unknown}' in table '{self.model.__name__}, valid fields are "
+            f"Unknown field '{self.unknown}' in table '{self.model.__name__}', valid fields are "
             f"{self.valid_fields}"
         )
 

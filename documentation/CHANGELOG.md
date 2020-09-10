@@ -1,5 +1,10 @@
 # CHANGELOG
 
+#### 0.2.1
+
+* Added `serialize()` method to serialize a model instance in the same format
+  as a `GenericQuery`'s row.
+
 ### 0.2.0
 
 * Now can allow only specific field for each Model, or can use django's permission system

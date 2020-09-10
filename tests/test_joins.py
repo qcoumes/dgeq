@@ -28,8 +28,8 @@ class JoinMixinTestCase(TestCase):
         j.add_join("rivers", other, Country, self.censor)
         
         self.assertEqual(set(), j.fields)
-        self.assertEqual(set(), j.unique_foreign_field)
-        self.assertEqual(set(), j.many_foreign_fields)
+        self.assertEqual(set(), j.one_fields)
+        self.assertEqual(set(), j.many_fields)
         self.assertEqual({"rivers": other}, j.joins)
     
     
@@ -43,8 +43,8 @@ class JoinMixinTestCase(TestCase):
         j.add_join("disasters", disasters, Country, self.censor)
         
         self.assertEqual(set(), j.fields)
-        self.assertEqual(set(), j.unique_foreign_field)
-        self.assertEqual(set(), j.many_foreign_fields)
+        self.assertEqual(set(), j.one_fields)
+        self.assertEqual(set(), j.many_fields)
         self.assertEqual(
             {"rivers": rivers, "mountains": mountains, "disasters": disasters}, j.joins
         )
@@ -57,14 +57,14 @@ class JoinMixinTestCase(TestCase):
         j.add_join("countries__disasters", JoinMixin(), River, self.censor)
         j.add_join("countries__region", JoinMixin(), River, self.censor)
         
-        self.assertEqual(set(), j.unique_foreign_field)
-        self.assertEqual(set(), j.many_foreign_fields)
+        self.assertEqual(set(), j.one_fields)
+        self.assertEqual(set(), j.many_fields)
         self.assertIn("countries", j.joins)
         
-        self.assertEqual({"region"}, j.joins["countries"].unique_foreign_field)
+        self.assertEqual({"region"}, j.joins["countries"].one_fields)
         self.assertEqual(
             {"rivers", "disasters", "mountains"},
-            j.joins["countries"].many_foreign_fields
+            j.joins["countries"].many_fields
         )
         self.assertEqual(
             {"rivers", "disasters", "mountains", "region"},
@@ -76,18 +76,18 @@ class JoinMixinTestCase(TestCase):
         j = JoinMixin()
         j.add_join("countries__region__continent", JoinMixin(), River, self.censor)
         
-        self.assertEqual(set(), j.unique_foreign_field)
-        self.assertEqual(set(), j.many_foreign_fields)
+        self.assertEqual(set(), j.one_fields)
+        self.assertEqual(set(), j.many_fields)
         self.assertIn("countries", j.joins)
         
         current = j.joins["countries"]
-        self.assertEqual({"region"}, current.unique_foreign_field)
-        self.assertEqual(set(), current.many_foreign_fields)
+        self.assertEqual({"region"}, current.one_fields)
+        self.assertEqual(set(), current.many_fields)
         self.assertIn("region", current.joins)
         
         current = current.joins["region"]
-        self.assertEqual({"continent"}, current.unique_foreign_field)
-        self.assertEqual(set(), current.many_foreign_fields)
+        self.assertEqual({"continent"}, current.one_fields)
+        self.assertEqual(set(), current.many_fields)
         self.assertIn("continent", current.joins)
 
 
@@ -111,8 +111,8 @@ class JoinTestCase(TestCase, QueryTestMixin):
         self.assertEqual(Mountain, j.model)
         self.assertEqual("mountains", j.field)
         self.assertEqual({"height", "id", "name"}, j.fields)
-        self.assertEqual({"countries"}, j.many_foreign_fields)
-        self.assertEqual(set(), j.unique_foreign_field)
+        self.assertEqual({"countries"}, j.many_fields)
+        self.assertEqual(set(), j.one_fields)
         self.assertEqual(1, j.limit)
         self.assertEqual(1, j.start)
         self.assertEqual(["-height"], j.sort)
@@ -134,8 +134,8 @@ class JoinTestCase(TestCase, QueryTestMixin):
         self.assertEqual(Mountain, j.model)
         self.assertEqual("mountains", j.field)
         self.assertEqual({"name"}, j.fields)
-        self.assertEqual(set(), j.many_foreign_fields)
-        self.assertEqual(set(), j.unique_foreign_field)
+        self.assertEqual(set(), j.many_fields)
+        self.assertEqual(set(), j.one_fields)
         self.assertEqual(1, j.limit)
         self.assertEqual(1, j.start)
         self.assertEqual(["-height"], j.sort)
@@ -157,8 +157,8 @@ class JoinTestCase(TestCase, QueryTestMixin):
         self.assertEqual(Mountain, j.model)
         self.assertEqual("mountains", j.field)
         self.assertEqual({"height", "id"}, j.fields)
-        self.assertEqual({"countries"}, j.many_foreign_fields)
-        self.assertEqual(set(), j.unique_foreign_field)
+        self.assertEqual({"countries"}, j.many_fields)
+        self.assertEqual(set(), j.one_fields)
         self.assertEqual(1, j.limit)
         self.assertEqual(1, j.start)
         self.assertEqual(["-height"], j.sort)
@@ -180,8 +180,8 @@ class JoinTestCase(TestCase, QueryTestMixin):
         self.assertEqual(Mountain, j.model)
         self.assertEqual("mountains", j.field)
         self.assertEqual({"height"}, j.fields)
-        self.assertEqual(set(), j.many_foreign_fields)
-        self.assertEqual(set(), j.unique_foreign_field)
+        self.assertEqual(set(), j.many_fields)
+        self.assertEqual(set(), j.one_fields)
         self.assertEqual(1, j.limit)
         self.assertEqual(1, j.start)
         self.assertEqual(["-height"], j.sort)

@@ -38,7 +38,7 @@ long_description = (codecs.open(os.path.join(dirname, 'README.md'), encoding='ut
 
 setup(
     name='dgeq',
-    version="0.2.0",
+    version="0.2.1",
     description=short_description,
     long_description=long_description,
     long_description_content_type='text/markdown',
