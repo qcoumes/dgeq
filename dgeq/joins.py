@@ -55,7 +55,7 @@ class JoinMixin:
             # otherwise
             if current not in self.joins:
                 target = utils.get_field(base_name, model, censor, sep)
-                self.joins[current] = JoinQuery(target, base_name, censor, [field_name])
+                self.joins[current] = JoinQuery(target, base_name, censor, False, [field_name])
             else:
                 self.joins[current].add_field(field_name)
             
@@ -66,8 +66,12 @@ class JoinMixin:
             self.joins[field] = join
     
     
+    def prefetch(self, queryset: models.QuerySet) -> models.QuerySet:
+        raise NotImplementedError()
+    
+    
     def fetch(self, obj: models.Model) -> Union[dict, List[dict]]:
-        raise NotImplementedError(f"Class using {self.__class__.__name__} must implement `fetch()`")
+        raise NotImplementedError()
 
 
 
@@ -76,21 +80,11 @@ class JoinQuery(JoinMixin):
     
     `JoinQuery` recursively contains other `JoinQuery`."""
     
-    start: int
-    limit: int = 0
-    sort: Iterable[str]
-    filters: Iterable[Filter]
-    model: Type[models.Model]
-    joins: Dict[str, 'JoinQuery']
-    fields: Set[str]
-    one_fields: Set[str]
-    many_fields: Set[str]
-    many: bool
-    
     
     def __init__(self, target: utils.ForeignField, field: str, censor: Censor,
-                 show: Iterable[str] = (), hide: Iterable[str] = (), sort: Iterable[str] = (),
-                 filters: Iterable[Filter] = (), start: int = 0, limit: int = 0, ):
+                 distinct: bool = False, show: Iterable[str] = (),
+                 hide: Iterable[str] = (), sort: Iterable[str] = (), filters: Iterable[Filter] = (),
+                 start: int = 0, limit: int = 0, ):
         super().__init__()
         
         self.model = target.related_model
@@ -99,8 +93,8 @@ class JoinQuery(JoinMixin):
         self.limit = limit
         self.sort = sort
         self.filters = filters
+        self.distinct = distinct
         self.many = isinstance(target, utils.MANY_FOREIGN_FIELD)
-        
         target_model = target.related_model
         if show:
             fields = set(show)
@@ -169,6 +163,15 @@ class JoinQuery(JoinMixin):
                 (f if not f.startswith("-") else f[1:]), target_model, censor, arbitrary_fields
             )
         
+        # Retrieve distinct
+        distinct = query_dict.get("distinct", "0")
+        if distinct.isdigit():
+            distinct = bool(int(distinct[0]))
+        else:
+            raise InvalidCommandError(
+                "c:join", f"'distinct' value must be either 0 or 1 (received '{distinct}')'"
+            )
+        
         # Retrieve filters
         filters = list()
         for f in query_dict.getlist("filters"):
@@ -181,13 +184,13 @@ class JoinQuery(JoinMixin):
             utils.check_field(k, target_model, censor, arbitrary_fields)
             filters.append(Filter(k, v, case))
         
-        return cls(target, field_name, censor, show, hide, sort, filters, start, limit)
+        return cls(target, field_name, censor, distinct, show, hide, sort, filters, start, limit)
     
     
     def prefetch(self, queryset: models.QuerySet) -> models.QuerySet:
         """Recursively prefetch joins to speed up the database query."""
         subquery = self.model.objects.all()
-
+        
         if self.filters:
             q = reduce(operator.and_, [f.get() for f in self.filters])
             subquery = subquery.filter(q)
@@ -221,6 +224,9 @@ class JoinQuery(JoinMixin):
         
         if self.sort:
             subquery = subquery.order_by(*self.sort)
+        
+        if self.distinct:
+            subquery = subquery.distinct()
         
         if self.limit != 0:
             subquery = subquery[self.start:self.start + self.limit]

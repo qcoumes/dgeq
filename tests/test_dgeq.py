@@ -1,10 +1,11 @@
-from unittest.mock import patch
-
 from django.contrib.auth.models import AnonymousUser, Permission, User
+from django.db import models
 from django.http import QueryDict
 from django.test import TestCase
 
-from dgeq import GenericQuery, commands
+from dgeq import GenericQuery
+from dgeq.censor import Censor
+from dgeq.joins import JoinQuery
 from django_dummy_app.models import Country, Region, River
 
 
@@ -16,101 +17,7 @@ class DgeqTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-    
-    
-    @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
-    def test_step(self):
-        query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(self.user, Country, query_dict)
-        self.assertEqual(True, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertIn("time", dgeq.result)
-    
-    
-    @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
-    def test_2_step_1_step(self):
-        query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(self.user, Country, query_dict)
-        self.assertEqual(True, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step(2)
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertIn("time", dgeq.result)
-    
-    
-    @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
-    def test_1_step_2_step(self):
-        query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(self.user, Country, query_dict)
-        self.assertEqual(True, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step(2)
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertIn("time", dgeq.result)
-    
-    
-    @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
-    def test_step_none(self):
-        query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(self.user, Country, query_dict)
-        self.assertEqual(True, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step(None)
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertIn("time", dgeq.result)
-    
-    
-    @patch("dgeq.dgeq.DGEQ_COMMANDS", [commands.Case(), commands.Related(), commands.Time()])
-    def test_1_step_none(self):
-        query_dict = QueryDict("c:case=0&c:related=0&c:time=1")
-        dgeq = GenericQuery(self.user, Country, query_dict)
-        self.assertEqual(True, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step()
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(True, dgeq.related)
-        self.assertNotIn("time", dgeq.result)
-        
-        dgeq.step(None)
-        self.assertEqual(False, dgeq.case)
-        self.assertEqual(False, dgeq.related)
-        self.assertIn("time", dgeq.result)
+        cls.censor = Censor(cls.user)
     
     
     def test_dgeq_error(self):
@@ -118,7 +25,7 @@ class DgeqTestCase(TestCase):
         dgeq = GenericQuery(self.user, Country, query_dict)
         res = dgeq.evaluate()
         self.assertEqual(False, res["status"])
-        self.assertEqual("INVALID_VALUE_ERROR", res["code"])
+        self.assertEqual("INVALID_COMMAND_ERROR", res["code"])
         self.assertIn("command", res)
         self.assertEqual("c:case", res["command"])
     
@@ -232,7 +139,7 @@ class DgeqTestCase(TestCase):
         more than 100000 meters."""
         query_dict = QueryDict(
             "c:annotate=field=mountains.height|func=sum|to=sum_mountains_height|early=1"
-            "&sum_mountains_height=>100000&c:show=name,id,area&c:limit=0&c:sort=name"
+            "&sum_mountains_height=>100000&c:show=name,id,area&c:sort=name"
         )
         dgeq = GenericQuery(self.user, Country, query_dict)
         res = dgeq.evaluate()
@@ -313,7 +220,7 @@ class DgeqTestCase(TestCase):
         population."""
         query_dict = QueryDict(
             "c:annotate=field=countries.population|func=min|to=pop_min|early=1"
-            "&pop_min=<10000&c:show=name,countries,continent&c:limit=5&c:sort=pop_min"
+            "&pop_min=<10000&c:show=name,countries,continent&c:sort=pop_min&c:limit=5"
             "&c:join=field=continent|show=name"
             "&c:join=field=countries|show=name|sort=population|limit=1"
         )
@@ -385,10 +292,28 @@ class DgeqTestCase(TestCase):
             ]
         }
         self.assertEqual(expected, res)
+
+    def test_advanced_4(self):
+        """Count if there is at least five regions where the country with the
+        lowest population is less more 100000.
+        
+        The five regions are the first when sorted by the value of the lower
+        population."""
+        query_dict = QueryDict(
+            "c:annotate=field=countries.population|func=min|to=pop_min|early=1"
+            "&pop_min=>10000&c:evaluate=0&c:sort=pop_min&c:count=1&c:limit=5"
+        )
+        dgeq = GenericQuery(self.user, Region, query_dict)
+        res = dgeq.evaluate()
+        expected = {
+            "status": True,
+            "count": 5
+        }
+        self.assertEqual(expected, res)
     
     
     def test_private(self):
-        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name&c:limit=1")
         dgeq = GenericQuery(self.user, Country, query_dict, private_fields={
             River:   ["countries", "discharge"],
             Country: ["forests", "mountains", "disasters"]
@@ -430,7 +355,7 @@ class DgeqTestCase(TestCase):
     
     
     def test_public(self):
-        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name&c:limit=1")
         dgeq = GenericQuery(self.user, Country, query_dict, public_fields={
             River:   ["length", "id", "name"],
             Country: ["area", "id", "population", "name", "region", "rivers"]
@@ -472,7 +397,7 @@ class DgeqTestCase(TestCase):
     
     
     def test_permission_and_private(self):
-        query_dict = QueryDict("c:join=field=rivers&c:sort=name")
+        query_dict = QueryDict("c:join=field=rivers&c:sort=name&c:limit=1")
         user = User.objects.create_user("test")
         user.user_permissions.add(Permission.objects.get(codename='view_country'))
         user.user_permissions.add(Permission.objects.get(codename='view_river'))
@@ -514,3 +439,37 @@ class DgeqTestCase(TestCase):
         res = dgeq.evaluate()
         self.assertIn("code", res)
         self.assertEqual("UNKNOWN_FIELD", res["code"])
+    
+    
+    def test__evaluate_each_field_type(self):
+        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq.fields = {"name", "population", "rivers", "region", "rivers_length_avg"}
+        dgeq.arbitrary_fields = {"rivers_length_avg"}
+        dgeq.queryset = Country.objects.all().annotate(rivers_length_avg=models.Avg("rivers__length"))
+        rows = dgeq._evaluate()
+        self.assertEqual(Country.objects.all().count(), len(rows))
+    
+    
+    def test__evaluate_no_related(self):
+        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq.fields = {"name", "population", "rivers", "region"}
+        dgeq.arbitrary_fields = set()
+        dgeq.queryset = Country.objects.all()
+        dgeq.related = False
+        rows = dgeq._evaluate()
+        self.assertEqual(Country.objects.all().count(), len(rows))
+    
+    
+    def test__evaluate_joins(self):
+        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq.fields = {"name", "population", "rivers", "region"}
+        dgeq.arbitrary_fields = set()
+        dgeq.queryset = Country.objects.all()
+        
+        j_rivers = JoinQuery.from_query_value("field=rivers", Country, False, self.censor)
+        j_region = JoinQuery.from_query_value("field=region", Country, False, self.censor)
+        dgeq.add_join("rivers", j_rivers, Country, self.censor)
+        dgeq.add_join("region", j_region, Country, self.censor)
+        
+        rows = dgeq._evaluate()
+        self.assertEqual(Country.objects.all().count(), len(rows))

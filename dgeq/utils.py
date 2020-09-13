@@ -279,7 +279,7 @@ def subquery_to_querydict(qs: str, fields_sep: str = SUBQUERY_SEP_FIELDS,
 
 
 
-def split_list_strings(lst: Iterable[str], sep: str) -> List[str]:
+def split_list_strings(lst: Iterable[str], sep: str = ',') -> List[str]:
     """Return a list of the words in each string of `lst`, using `sep` as
     delimiter.
     
@@ -319,6 +319,15 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
             many_fields.add(field_name)
     
     return set_fields, one_fields, many_fields
+
+
+
+class DistinctCount(models.Count):
+    """Wrap `models.Count(distinct=True)`."""
+    
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, distinct=True, **kwargs)
 
 
 

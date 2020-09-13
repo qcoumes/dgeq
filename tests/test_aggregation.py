@@ -134,7 +134,7 @@ class AnnotationTestCase(TestCase):
     def test_functions(self):
         attributes = [
             "rivers_length_max", "rivers_length_min", "rivers_length_avg", "rivers_length_sum",
-            "rivers_length_cnt", # "rivers_length_stddev", "rivers_length_var"
+            "rivers_length_dcnt", "rivers_length_cnt", # "rivers_length_stddev", "rivers_length_var"
         ]
         annotations = [
             Annotation("rivers__length", "rivers_length_max", models.Max),
@@ -142,6 +142,7 @@ class AnnotationTestCase(TestCase):
             Annotation("rivers__length", "rivers_length_avg", models.Avg),
             Annotation("rivers__length", "rivers_length_sum", models.Sum),
             Annotation("rivers__length", "rivers_length_cnt", models.Count),
+            Annotation("rivers__length", "rivers_length_dcnt", utils.DistinctCount),
             # These function aren't supported by sqlite at the moment
             # Annotation("rivers__length", "rivers_length_stddev", models.StdDev),
             # Annotation("rivers__length", "rivers_length_var", models.Variance),
@@ -159,6 +160,7 @@ class AnnotationTestCase(TestCase):
             rivers_length_avg=models.Avg("rivers__length"),
             rivers_length_sum=models.Sum("rivers__length"),
             rivers_length_cnt=models.Count("rivers__length"),
+            rivers_length_dcnt=models.Count("rivers__length", distinct=True),
             # rivers_length_var=models.Variance("rivers__length"),
             # rivers_length_stddev=models.StdDev("rivers__length")
         )

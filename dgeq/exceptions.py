@@ -63,7 +63,7 @@ class UnknownFieldError(DgeqError):
         self.model = model
         self.unknown = unknown
         self.valid_fields = [f.name for f in model._meta.get_fields(include_hidden=include_hidden)]
-        self.valid_fields = censor.censor(model, self.valid_fields)
+        self.valid_fields = list(censor.censor(model, self.valid_fields))
     
     
     def __str__(self):
@@ -92,7 +92,7 @@ class NotARelatedFieldError(DgeqError):
             f.name for f in model._meta.get_fields(include_hidden=include_hidden) if
             f.remote_field is not None
         ]
-        self.foreign_fields = censor.censor(model, self.foreign_fields)
+        self.foreign_fields = list(censor.censor(model, self.foreign_fields))
     
     
     def __str__(self):
@@ -126,7 +126,7 @@ class FieldDepthError(DgeqError):
 class InvalidCommandError(DgeqError):
     """Raised when a commands is misused or its value is invalid."""
     
-    code = "INVALID_VALUE_ERROR"
+    code = "INVALID_COMMAND_ERROR"
     details = ['command']
     
     

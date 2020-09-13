@@ -1,19 +1,17 @@
 import logging
 import re
 import time
-from typing import Dict, Optional, Set, Type, Union
+from typing import Any, Dict, List, Type, Union
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.db import models
-from django.db.models import QuerySet
 from django.http import QueryDict
 
-from . import commands
-from .exceptions import DgeqError
-from .joins import JoinMixin, JoinQuery
+from . import commands, utils
 from .censor import Censor
-from .utils import FieldMapping, import_callable
+from .exceptions import DgeqError
+from .joins import JoinMixin
 
 
 logger = logging.getLogger(__file__)
@@ -21,24 +19,28 @@ logger = logging.getLogger(__file__)
 # List of commands used to construct the queryset. They are all called in the
 # given order when calling the method `prepare()` and `evaluate()` of
 # `GenericQuery`. This list can be changed with the setting `DGEQ_COMMANDS`.
-DEFAULT_COMMANDS = [
+DEFAULT_PRE_COMMANDS: List[commands.Command] = [
     commands.Case(),
-    commands.Related(),
-    commands.ComputeAnnotation(),
-    commands.Annotate(early=True),
+    commands.Annotate(),
     commands.Filtering(),
-    commands.Annotate(early=False),
+    commands.Distinct(),
     commands.Sort(),
     commands.Subset(),
     commands.Join(),
     commands.Show(),
     commands.Aggregate(),
-    commands.Count(),
     commands.Evaluate(),
+]
+DGEQ_PRE_COMMANDS: List[commands.Command] = [
+    utils.import_callable(p) for p in getattr(settings, "DGEQ_PRE_COMMANDS", DEFAULT_PRE_COMMANDS)
+]
+
+DEFAULT_POST_COMMANDS: List[commands.Command] = [
+    commands.Count(),
     commands.Time(),
 ]
-DGEQ_COMMANDS = [
-    import_callable(p) for p in getattr(settings, "DGEQ_COMMANDS", DEFAULT_COMMANDS)
+DGEQ_POST_COMMANDS: List[commands.Command] = [
+    utils.import_callable(p) for p in getattr(settings, "DGEQ_POST_COMMANDS", DEFAULT_POST_COMMANDS)
 ]
 
 QueryDictType = Union[QueryDict, Type[QueryDict]]
@@ -96,64 +98,72 @@ class GenericQuery(JoinMixin):
     ```
     
     """
-    arbitrary_fields: Set[str]
-    case: bool
-    fields: Set[str]
-    model: Type[models.Model]
-    queryset: QuerySet
-    result: dict
-    time: float
-    joins: Dict[str, JoinQuery]
-    related: bool
-    private_fields: Dict[Type[models.Model], Set[str]]
+    
+    result: Dict[str, Any]
     
     
     def __init__(self, user: Union[User, AnonymousUser], model: Type[models.Model],
-                 query_dict: QueryDictType, public_fields: FieldMapping = None,
-                 private_fields: FieldMapping = None, use_permissions: bool = False):
+                 query_dict: QueryDictType, public_fields: utils.FieldMapping = None,
+                 private_fields: utils.FieldMapping = None, use_permissions: bool = False):
         super().__init__()
         
-        self._query_dict = query_dict
-        self._step = 0
+        self._query_dict_list = list(query_dict.lists())
+        self._time = time.time()
         
         self.model = model
         self.censor = Censor(user, public_fields, private_fields, use_permissions)
-        self.case = True
         self.fields = {f.name for f in model._meta.get_fields()}  # noqa
         self.arbitrary_fields = set()
-        self.time = time.time()
-        self.result = {'status': True}
-        self.related = True
-        self.private_fields = private_fields or dict()
         self.queryset = self.model.objects.all()
+        self.result = {'status': True}
+        self.case = True
+        self.evaluated = True
+        self.sliced = False
     
     
-    def step(self, n_step: Optional[int] = 1) -> None:
-        """Allow to execute only one (or more) command at a time.
+    def _evaluate(self) -> List[Dict[str, Any]]:
+        fields = set(self.fields)
+        fields |= set(self.arbitrary_fields)
+        fields = self.censor.censor(self.model, fields)
         
-        You can optionally specify the number of step to be executed (default
-        to 1), use `None` to execute all remaining the steps."""
-        if n_step is None:
-            n_step = len(DGEQ_COMMANDS) - self._step
+        fields, one_fields, many_fields = utils.split_related_field(
+            self.model, fields, self.arbitrary_fields
+        )
+        queryset = self.queryset.select_related(
+            *[f for f in one_fields if f not in self.joins.keys()]
+        )
+        queryset = queryset.prefetch_related(
+            *[f for f in many_fields if f not in self.joins.keys()]
+        )
         
-        for command in DGEQ_COMMANDS[self._step:self._step + n_step]:
-            # Build the QueryDict with keys matching the command's regex
-            querydict = QueryDict(mutable=True)
-            if command.regex is not None:
-                for k, v in self._query_dict.lists():
-                    if re.match(command.regex, k):
-                        querydict.setlist(k, v)
-            command(self, querydict)
-            self._step += 1
+        rows = list()
+        for item in queryset:
+            rows.append(utils.serialize_row(item, fields, one_fields, many_fields, self.joins))
+        
+        return rows
     
     
     def evaluate(self):
-        """Execute all the commands and return the result.
+        """Execute commands in `DGEQ_PRE_COMMANDS` on each field matching the
+        command's regex, then evaluate the queryset (adding the rows to
+        `self.result` before executing command in DGEQ_POST_COMMANDS.
         
-        If some commands had already been executed through `step()`, execute all
-        the remaining command before returning the result."""
+        Return `self.result`.
+        """
         try:
-            self.step(n_step=None)
+            for field, lst in self._query_dict_list:
+                matching_commands = (c for c in DGEQ_PRE_COMMANDS if re.match(c.regex, field))
+                for command in matching_commands:
+                    command(self, field, lst)
+            
+            if self.evaluated:
+                self.result['rows'] = self._evaluate()
+            
+            for field, lst in self._query_dict_list:
+                matching_commands = (c for c in DGEQ_POST_COMMANDS if re.match(c.regex, field))
+                for command in matching_commands:
+                    command(self, field, lst)
+            
             result = self.result
         
         except DgeqError as e:

@@ -104,7 +104,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     
     def test_join_from_query_ok(self):
         subquery = (
-            "field=mountains|start=1|limit=1|sort=-height|"
+            "field=mountains|start=1|limit=1|sort=-height|distinct=0|"
             "filters=height=<3000'height=>1500"
         )
         j = JoinQuery.from_query_value(subquery, Country, False, self.censor)
@@ -127,7 +127,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     
     def test_join_from_query_show_ok(self):
         subquery = (
-            "field=mountains|show=name|start=1|limit=1|sort=-height|"
+            "field=mountains|show=name|start=1|limit=1|sort=-height|distinct=1|"
             "filters=height=<3000'height=>1500"
         )
         j = JoinQuery.from_query_value(subquery, Country, False, self.censor)
@@ -229,6 +229,14 @@ class JoinTestCase(TestCase, QueryTestMixin):
         with self.assertRaises(InvalidCommandError):
             JoinQuery.from_query_value(subquery, Country, False, self.censor)
     
+    def test_join_from_query_distinct_invalid(self):
+        subquery = (
+            "field=mountains|show=name|distinct=-1|limit=1|sort=-height|"
+            "filters=height=<3000'height=>1500"
+        )
+        with self.assertRaises(InvalidCommandError):
+            JoinQuery.from_query_value(subquery, Country, False, self.censor)
+    
     
     def test_join_from_query_limit_invalid(self):
         subquery = (
@@ -249,7 +257,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     
     
     def test_prefetch_many(self):
-        j = JoinQuery.from_query_value("field=mountains|sort=-height", Country, False, self.censor)
+        j = JoinQuery.from_query_value("field=mountains|sort=-height|distinct=1", Country, False, self.censor)
         rows = list()
         with CaptureQueriesContext(connections['default']):
             for c in Country.objects.all():
@@ -303,7 +311,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     
     
     def test_prefetch_reduce_num_queries_and_time_many(self):
-        j = JoinQuery.from_query_value("field=mountains", Country, False, self.censor)
+        j = JoinQuery.from_query_value("field=mountains|distinct=0", Country, False, self.censor)
         with CaptureQueriesContext(connections['default']) as context:
             for c in Country.objects.all():
                 j.fetch(c)
@@ -357,6 +365,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     
     def test_prefetch_depth_2(self):
         j = JoinMixin()
+        
         j.add_join(
             "countries__mountains",
             JoinQuery.from_query_value(

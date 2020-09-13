@@ -1,7 +1,8 @@
 import time
-from typing import Dict, TYPE_CHECKING
+from abc import ABC, abstractmethod
+from typing import List, TYPE_CHECKING
 
-from django.http import QueryDict
+from django.db.models import Q
 
 from . import utils
 from .aggregations import Aggregation, Annotation
@@ -15,7 +16,18 @@ if TYPE_CHECKING:
 
 
 
-class ComputeAnnotation:
+class Command(ABC):
+    """Interface for commands."""
+    regex = None
+    
+    
+    @abstractmethod
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        pass
+
+
+
+class Annotate(Command):
     """Annotations are made up of key value pairs delimited by a pipe `|`:
     `key:value|key:value`. Valid keys are :
     
@@ -58,8 +70,8 @@ class ComputeAnnotation:
     regex = "^c:annotate$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        annotations = utils.split_list_strings(query_dict.getlist("c:annotate"), ",")
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        annotations = utils.split_list_strings(values)
         
         query.annotations = list()
         
@@ -67,30 +79,12 @@ class ComputeAnnotation:
             a = Annotation.from_query_value(
                 a, query.model, query.case, query.censor, query.arbitrary_fields
             )
-            query.annotations.append(a)
             query.arbitrary_fields.add(a.to)
+            query.queryset = a.apply(query.queryset)
 
 
 
-class Annotate:
-    """Compute Annotation created in ComputeAnnotation according to `delayed`
-    value."""
-    
-    regex = None
-    
-    
-    def __init__(self, early: bool):
-        self.early = early
-    
-    
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        annotations = getattr(query, "annotations", ())
-        for annotation in (a for a in annotations if a.early == self.early):
-            query.queryset = annotation.apply(query.queryset)
-
-
-
-class Aggregate:
+class Aggregate(Command):
     """Create aggregations by parsing query's `c:aggregate` value.
     
     Aggregations are made up of key value pairs delimited by a pipe `|`:
@@ -109,8 +103,8 @@ class Aggregate:
     regex = "^c:aggregate$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        aggregations = utils.split_list_strings(query_dict.getlist("c:aggregate"), ",")
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        aggregations = utils.split_list_strings(values)
         aggregations = [
             Aggregation.from_query_value(
                 a, query.model, query.censor, query.arbitrary_fields
@@ -118,15 +112,14 @@ class Aggregate:
             for a in aggregations
         ]
         
-        if aggregations:
-            query.result = {
-                **query.result,
-                **query.queryset.aggregate(**dict(aggregations)),
-            }
+        query.result = {
+            **query.result,
+            **query.queryset.aggregate(**dict(aggregations)),
+        }
 
 
 
-class Case:
+class Case(Command):
     """Modify filters' case-sensitiveness by looking at query's `c:case` value.
     
     A value of 1 mean the filters are case-sensitive, 0 mean case-insensitive,
@@ -135,30 +128,16 @@ class Case:
     regex = "^c:case$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (c := query_dict.get("c:case", "1")).isdigit():
-            raise InvalidCommandError('c:case', f"value must be either 0 or 1 (received '{c}')")
-        query.case = bool(int(c))
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if not values[-1].isdigit():
+            raise InvalidCommandError(
+                'c:case', f"value must be either 0 or 1 (received '{values[-1]}')"
+            )
+        query.case = bool(int(values[-1]))
 
 
 
-class Related:
-    """Allow to disable the retrieval of related field altogether.
-    
-    Use `c:related=0` to not compute any related field, default to 1 if
-    `c:related` is absent."""
-    
-    regex = "^c:related"
-    
-    
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (c := query_dict.get("c:related", "1")).isdigit():
-            raise InvalidCommandError('c:related', f"value must be either 0 or 1 (received '{c}')")
-        query.related = bool(int(c))
-
-
-
-class Count:
+class Count(Command):
     """Add the number of object in the database matching the query.
     
     Count will be added in the key `count` in the result if `c:count` value is
@@ -167,15 +146,44 @@ class Count:
     regex = "^c:count$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (c := query_dict.get("c:count", "0")).isdigit():
-            raise InvalidCommandError("c:count", f"value must be either 0 or 1 (received '{c}')")
-        if int(c):
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if not values[-1].isdigit():
+            raise InvalidCommandError(
+                "c:count", f"value must be either 0 or 1 (received '{values[-1]}')"
+            )
+        
+        if int(values[-1]):
             query.result['count'] = query.queryset.count()
 
 
 
-class Evaluate:
+class Distinct(Command):
+    """Eliminate duplicate from the resulting rows.
+    
+    By default, a query will not eliminate duplicate rows. In practice, this is
+    rarely a problem, because simple queries don’t introduce the possibility of
+    duplicate result rows. However, if your query spans multiple tables, it’s
+    possible to get duplicate results when a query is evaluated."""
+    
+    regex = "^c:distinct$"
+    
+    
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if query.sliced:
+            raise InvalidCommandError(
+                "c:distinct", "cannot be used after 'c:start' or 'c:limit'"
+            )
+        
+        if not values[-1].isdigit():
+            raise InvalidCommandError(
+                f'c:distinct$', f"value must be either 0 or 1 (received '{values[-1]}')"
+            )
+        if int(values[-1]):
+            query.queryset = query.queryset.distinct()
+
+
+
+class Evaluate(Command):
     """Evaluate the query, putting the result in the `rows` key of the result.
     
     Rows will not be computed if `c:evaluated` value is 0, default to 1 if
@@ -184,38 +192,16 @@ class Evaluate:
     regex = "^c:evaluate$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (b := query_dict.get("c:evaluate", "1")).isdigit():
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if not values[-1].isdigit():
             raise InvalidCommandError(
-                f'c:evaluate', f"value must be either 0 or 1 (received '{b}')"
+                f'c:evaluate', f"value must be either 0 or 1 (received '{values[-1]}')"
             )
-        if not int(b):
-            return
-        
-        fields = set(query.fields)
-        fields |= query.arbitrary_fields
-        fields = query.censor.censor(query.model, fields)
-        
-        fields, one_fields, many_fields = utils.split_related_field(
-            query.model, fields, query.arbitrary_fields
-        )
-        joins: Dict[str, JoinQuery] = getattr(query, "joins", dict())
-        queryset = query.queryset.select_related(
-            *[f for f in one_fields if f not in joins.keys()]
-        )
-        queryset = queryset.prefetch_related(
-            *[f for f in many_fields if f not in joins.keys()]
-        )
-        
-        rows = list()
-        for item in queryset:
-            rows.append(utils.serialize_row(item, fields, one_fields, many_fields, joins))
-        
-        query.result["rows"] = rows
+        query.evaluated = int(values[-1])
 
 
 
-class Filtering:
+class Filtering(Command):
     """Apply filters on the query by looking at every query's field not starting
     with `c:`.
     
@@ -269,24 +255,26 @@ class Filtering:
     [1] https://en.wikipedia.org/wiki/ISO_8601
     """
     
-    regex = "^[^c][^:]?.*$"
+    regex = r"^(?!c:).*$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        for field, l in [i for i in query_dict.lists()]:
-            values = utils.split_list_strings(l, ",")
-            
-            filters = list()
-            for v in values:
-                utils.check_field(field, query.model, query.censor, query.arbitrary_fields)
-                filters.append(Filter(field, v, query.case))
-            
-            for f in filters:
-                query.queryset = f.apply(query.queryset)
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if query.sliced:
+            raise InvalidCommandError(
+                field, "You cannot filter on fields after 'c:start' or 'c:limit'"
+            )
+        
+        values = utils.split_list_strings(values)
+        filters = Q()
+        for v in values:
+            utils.check_field(field, query.model, query.censor, query.arbitrary_fields)
+            filters &= Filter(field, v, query.case).get()
+        
+        query.queryset = query.queryset.filter(filters)
 
 
 
-class Join:
+class Join(Command):
     """Allow to retrieve data of related models instead of only their PK.
     
      Joins are declared with the `c:join` field and is made up of key value
@@ -317,8 +305,8 @@ class Join:
     regex = "^c:join$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        joins = utils.split_list_strings(query_dict.getlist("c:join"), ",")
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        joins = utils.split_list_strings(values)
         
         # Create joins in the query
         query_joins = dict()
@@ -328,7 +316,8 @@ class Join:
             )
             query_joins[j.field] = j
         
-        # Sort join by their number of related model
+        # Sort join by their number of related model so that no useless
+        # intermediary joins are created
         sorted_query_join = sorted(
             query_joins.items(), key=lambda i: i[0].count("__")
         )
@@ -342,7 +331,7 @@ class Join:
 
 
 
-class Show:
+class Show(Command):
     """Allow to choose which field to include or remove.
     
     By default, every field of the queried model are included in the result. Use
@@ -352,23 +341,23 @@ class Show:
     regex = "^c:(show)|(hide)$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        show = utils.split_list_strings(query_dict.getlist("c:show"), ",")
-        if show:
-            for f in show:
-                utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
-            query.fields = set(show)
-            return
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        # Reset fields so that previous hide or show does not affect this one
+        query.fields = {f.name for f in query.model._meta.get_fields()}  # noqa
         
-        hide = utils.split_list_strings(query_dict.getlist("c:hide"), ",")
-        for f in hide:
+        fields = utils.split_list_strings(values)
+        for f in fields:
             utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
-        query.fields |= set(query.arbitrary_fields)
-        query.fields -= set(hide)
+        
+        if field == "c:show":
+            query.fields = set(fields)
+        else:
+            query.fields |= set(query.arbitrary_fields)
+            query.fields -= set(fields)
 
 
 
-class Sort:
+class Sort(Command):
     """Sort the resulting rows by the provided fields in `c:sort` field.
     
     Value must be a comma separated list of field. Prepend an hyphen `-` to use
@@ -380,8 +369,13 @@ class Sort:
     regex = "^c:sort$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        fields = utils.split_list_strings(query_dict.getlist("c:sort"), ",")
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if query.sliced:
+            raise InvalidCommandError(
+                "c:sort", "cannot be used after 'c:start' or 'c:limit'"
+            )
+        
+        fields = utils.split_list_strings(values)
         
         for f in fields:
             utils.check_field(
@@ -389,12 +383,11 @@ class Sort:
                 query.arbitrary_fields
             )
         
-        if fields:
-            query.queryset = query.queryset.order_by(*[f.replace(".", "__") for f in fields])
+        query.queryset = query.queryset.order_by(*[f.replace(".", "__") for f in fields])
 
 
 
-class Subset:
+class Subset(Command):
     """Allow to retrieve only a subset of the result with the `c:start` and
     `c:limit` commands.
     
@@ -407,35 +400,42 @@ class Subset:
     regex = "^c:((start)|(limit))$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (start := query_dict.get("c:start", "0")).isdigit():
-            raise InvalidCommandError(
-                f'c:start', f"value must be a non-negative integers (received '{start}')")
-        
-        if not (limit := query_dict.get("c:limit", "1")).isdigit():
-            raise InvalidCommandError(
-                f'c:start', f"value must be a non-negative integers (received '{limit}')"
-            )
-        
-        start, limit = int(start), int(limit)
-        if limit != 0:
-            query.queryset = query.queryset[start:start + limit]
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if field == "c:start":
+            if not values[-1].isdigit():
+                raise InvalidCommandError(
+                    f'c:start', f"value must be a non-negative integers (received '{values[-1]}')")
         else:
+            if not values[-1].isdigit():
+                raise InvalidCommandError(
+                    f'c:limit', f"value must be a non-negative integers (received '{values[-1]}')"
+                )
+        
+        if field == "c:start":
+            start = int(values[-1])
             query.queryset = query.queryset[start:]
+            query.sliced = True
+        else:
+            limit = int(values[-1])
+            if limit:
+                query.queryset = query.queryset[:limit]
+            query.sliced = True
 
 
 
-class Time:
+class Time(Command):
     """Add the time taken by the server to compute your query.
     
     Time will be added in the key `time` in the result if `c:time` value is
     1, default to 0 if `c:time` is absent."""
     
-    regex = "^c:time"
+    regex = "^c:time$"
     
     
-    def __call__(self, query: 'GenericQuery', query_dict: QueryDict):
-        if not (t := query_dict.get("c:time", "0")).isdigit():
-            raise InvalidCommandError(f'c:case', f"value must be either 0 or 1 (received '{t}')")
-        if int(t):
-            query.result['time'] = time.time() - query.time
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        if not values[-1].isdigit():
+            raise InvalidCommandError(
+                f'c:time', f"value must be either 0 or 1 (received '{values[-1]}')"
+            )
+        if int(values[-1]):
+            query.result["time"] = time.time() - query._time  # noqa

@@ -1,14 +1,14 @@
 from functools import reduce
-from typing import Dict, Iterable, Tuple, Type
+from typing import Iterable, Tuple, Type
 
 from django.conf import settings
 from django.db import models
 from django.db.models import QuerySet
 
 from . import utils
+from .censor import Censor
 from .exceptions import InvalidCommandError, UnknownFieldError
 from .filter import Filter
-from .censor import Censor
 
 
 # Function used in aggregation and annotation. New entry can be added by with
@@ -22,6 +22,7 @@ DEFAULT_AGGREGATION_FUNCTION = {
     "stddev": models.StdDev,
     "var":    models.Variance,
     "count":  models.Count,
+    "dcount": utils.DistinctCount,
 }
 AGGREGATION_FUNCTION = {
     **DEFAULT_AGGREGATION_FUNCTION,
@@ -137,16 +138,6 @@ class Annotation:
         self.func = func
         self.filters = filters
         self.early = early
-    
-    
-    def __eq__(self, other):
-        return (
-            self.field == other.field
-            and self.to == other.to
-            and self.func == other.func
-            and self.filters == other.filters
-            and self.early == other.early
-        )
     
     
     @classmethod
