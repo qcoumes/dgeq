@@ -347,7 +347,8 @@ def serialize_row(instance: models.Model, fields: Iterable[str] = (),
         if f in joins.keys():
             row[f] = joins[f].fetch(instance)
         else:
-            row[f] = getattr(instance, f).pk
+            row[f] = getattr(instance, f)
+            row[f] = None if row[f] is None else row[f].pk
     
     for f in many_fields:
         if f in joins.keys():
@@ -374,7 +375,8 @@ def serialize(user: [User, AnonymousUser], instance: models.Model,
     
     row = {f: getattr(instance, f) for f in fields}
     for f in one_fields:
-        row[f] = getattr(instance, f).pk
+        row[f] = getattr(instance, f)
+        row[f] = None if row[f] is None else row[f].pk
     for f in many_fields:
         row[f] = list(map(lambda o: o.pk, getattr(instance, f).all()))
     

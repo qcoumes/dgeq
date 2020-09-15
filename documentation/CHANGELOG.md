@@ -1,5 +1,9 @@
 # CHANGELOG
 
+#### 0.3.2
+
+* Joins now correctly account for nullable foreign key
+
 #### 0.3.1
 
 * Minor fix

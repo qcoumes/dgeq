@@ -253,7 +253,8 @@ class JoinQuery(JoinMixin):
             if f in self.joins.keys():
                 row[f] = self.joins[f].fetch(related)
             else:
-                row[f] = getattr(related, f).pk
+                row[f] = getattr(related, f)
+                row[f] = None if row[f] is None else row[f].pk
         
         for f in self.many_fields:
             if f in self.joins.keys():
