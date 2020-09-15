@@ -311,10 +311,10 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
         if field_name in arbitrary_fields:
             continue
         field = model._meta.get_field(field_name)  # noqa
-        if isinstance(field, UNIQUE_FOREIGN_FIELD):
+        if type(field) in UNIQUE_FOREIGN_FIELD:
             set_fields.discard(field_name)
             one_fields.add(field_name)
-        elif isinstance(field, MANY_FOREIGN_FIELD):
+        elif type(field) in MANY_FOREIGN_FIELD:
             set_fields.discard(field_name)
             many_fields.add(field_name)
     

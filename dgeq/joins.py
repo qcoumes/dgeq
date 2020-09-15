@@ -31,7 +31,7 @@ class JoinMixin:
     def add_field(self, field_name):
         """Add this field to an existing join."""
         field = self.model._meta.get_field(field_name)
-        if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
+        if type(field) in utils.UNIQUE_FOREIGN_FIELD:
             self.one_fields.add(field_name)
         else:
             self.many_fields.add(field_name)
@@ -94,7 +94,7 @@ class JoinQuery(JoinMixin):
         self.sort = sort
         self.filters = filters
         self.distinct = distinct
-        self.many = isinstance(target, utils.MANY_FOREIGN_FIELD)
+        self.many = type(target) in utils.MANY_FOREIGN_FIELD
         target_model = target.related_model
         if show:
             fields = set(show)
@@ -109,10 +109,10 @@ class JoinQuery(JoinMixin):
         self.many_fields = set()
         for field_name in list(self.fields):
             field = target_model._meta.get_field(field_name)  # noqa
-            if isinstance(field, utils.UNIQUE_FOREIGN_FIELD):
+            if type(field) in utils.UNIQUE_FOREIGN_FIELD:
                 self.fields.discard(field_name)
                 self.one_fields.add(field_name)
-            elif isinstance(field, utils.MANY_FOREIGN_FIELD):
+            elif type(field) in utils.MANY_FOREIGN_FIELD:
                 self.fields.discard(field_name)
                 self.many_fields.add(field_name)
     

@@ -1,6 +1,11 @@
 # CHANGELOG
 
-#### 0.3.0
+#### 0.3.1
+
+* Minor fix
+
+
+### 0.3.0
 
 * Instead of calling commands in a specific order, each field/value pair of the
 query string call the commands with a regex matching the field. The main
