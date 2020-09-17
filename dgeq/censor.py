@@ -1,11 +1,19 @@
 from typing import Dict, Iterable, Type, Union
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
 from dgeq.exceptions import UnknownFieldError
+
+
+# Fields always private
+DEFAULT_PRIVATE_FIELDS = {
+    User: ["password"]
+}
+DGEQ_PRIVATE_FIELDS = getattr(settings, "DGEQ_PRIVATE_FIELDS", DEFAULT_PRIVATE_FIELDS)
 
 
 
@@ -52,6 +60,9 @@ class Censor:
                 content_type = ContentType.objects.get_for_model(field_instance.remote_field.model)
                 if not self.user.has_perm(f"{content_type.app_label}.view_{content_type.model}"):
                     return True
+        
+        if model in DGEQ_PRIVATE_FIELDS and field in DGEQ_PRIVATE_FIELDS[model]:
+            return True
         
         if model in self.public:
             return field not in self.public[model]

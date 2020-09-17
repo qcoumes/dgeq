@@ -3,6 +3,7 @@
 #### 0.3.5
 
 * Fix an error occurring when a ForeignField is None
+* User's password are private by default
 
 #### 0.3.4
 
