@@ -1,5 +1,9 @@
 # CHANGELOG
 
+#### 0.3.5
+
+* Fix an error occurring when a ForeignField is None
+
 #### 0.3.4
 
 * Fix an exception when no related_name is given on a related field

@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Iterable, List, Set, Type, Union
+from typing import Any, Dict, Iterable, List, Optional, Set, Type, Union
 
 from django.db import models
 
@@ -246,9 +246,11 @@ class JoinQuery(JoinMixin):
         return rows
     
     
-    def _fetch_unique(self, obj: models.Model) -> dict:
+    def _fetch_unique(self, obj: models.Model) -> Optional[Dict[str, Any]]:
         field = self.field.split("__")[-1]
         related = getattr(obj, field)
+        if related is None:
+            return None
         
         row = {f: getattr(related, f) for f in self.fields}
         
@@ -268,6 +270,6 @@ class JoinQuery(JoinMixin):
         return row
     
     
-    def fetch(self, obj: models.Model) -> Union[dict, List[dict]]:
+    def fetch(self, obj: models.Model) -> Union[Optional[Dict[str, Any]], List[dict]]:
         """Recursively retrieve joined data from an object."""
         return self._fetch_many(obj) if self.many else self._fetch_unique(obj)
