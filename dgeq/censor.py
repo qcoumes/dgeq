@@ -43,11 +43,11 @@ class Censor:
         current user."""
         if self.use_permissions:
             try:
-                field_object = model._meta.get_field(field)
+                field_instance = model._meta.get_field(field)
             except FieldDoesNotExist:
                 raise UnknownFieldError(model, field, self)
-            if getattr(field_object, "remote_field", None) is not None:
-                content_type = ContentType.objects.get_for_model(field_object.remote_field.model)
+            if field_instance.is_relation:
+                content_type = ContentType.objects.get_for_model(field_instance.remote_field.model)
                 if not self.user.has_perm(f"{content_type.app_label}.view_{content_type.model}"):
                     return True
         

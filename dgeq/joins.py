@@ -31,7 +31,7 @@ class JoinMixin:
     def add_field(self, field_name):
         """Add this field to an existing join."""
         field = self.model._meta.get_field(field_name)
-        if type(field) in utils.UNIQUE_FOREIGN_FIELD:
+        if utils.is_one(field):
             self.one_fields.add(field_name)
         else:
             self.many_fields.add(field_name)
@@ -94,12 +94,15 @@ class JoinQuery(JoinMixin):
         self.sort = sort
         self.filters = filters
         self.distinct = distinct
-        self.many = type(target) in utils.MANY_FOREIGN_FIELD
+        self.many = utils.is_many(target)
         target_model = target.related_model
         if show:
             fields = set(show)
         else:
-            fields = {f.name for f in target_model._meta.get_fields()}  # noqa
+            fields = {
+                f.get_accessor_name() if utils.is_reverse(f) else f.name
+                for f in target_model._meta.get_fields()  # noqa
+            }
             fields -= set(hide)
         fields = censor.censor(self.model, fields)
         
@@ -109,10 +112,10 @@ class JoinQuery(JoinMixin):
         self.many_fields = set()
         for field_name in list(self.fields):
             field = target_model._meta.get_field(field_name)  # noqa
-            if type(field) in utils.UNIQUE_FOREIGN_FIELD:
+            if utils.is_one(field):
                 self.fields.discard(field_name)
                 self.one_fields.add(field_name)
-            elif type(field) in utils.MANY_FOREIGN_FIELD:
+            elif utils.is_many(field):
                 self.fields.discard(field_name)
                 self.many_fields.add(field_name)
     
@@ -133,7 +136,7 @@ class JoinQuery(JoinMixin):
             query_dict["field"], model, censor, arbitrary_fields
         )
         field = second_last_model._meta.get_field(last_field_name)
-        if getattr(field, "remote_field", None) is None:
+        if not field.is_relation:
             raise NotARelatedFieldError(second_last_model, query_dict['field'], censor)
         target = field
         target_model = target.related_model
@@ -234,12 +237,12 @@ class JoinQuery(JoinMixin):
             subquery = subquery[self.start:]
         
         rows = list()
+        
         for item in subquery:
             row = utils.serialize_row(
                 item, self.fields, self.one_fields, self.many_fields, self.joins
             )
             rows.append(row)
-        
         return rows
     
     

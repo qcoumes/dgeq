@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
+from django.db.models import Field
 from django.http import QueryDict
 from django.utils.module_loading import import_string
 
@@ -41,7 +42,6 @@ ImportableCallable = Union[
     Tuple[str, Dict[str, Any]],  # Dotted path to a class with kwargs
     Tuple[str, Iterable[Any], Dict[str, Any]],  # Dotted path to a class with args and kwargs
 ]
-
 # Fields containing a list of Foreign Keys.
 MANY_FOREIGN_FIELD = (models.ManyToOneRel, models.ManyToManyField, models.ManyToManyRel)
 # Fields containing only one Foreign Key
@@ -65,17 +65,17 @@ def _check_field(fields: List[str], current_model: Type[models.Model], censor: C
         # field in `current_model` or an arbitrary field
         for a in arbitrary_fields:
             if token == a:
-                # Value is not really important as long as it does not contain
-                # a `remote_field` member.
-                field = None
+                # Set relation for the subfield check below
+                field = Field()
+                field.is_relation = False
                 break
         else:
             field = current_model._meta.get_field(token)  # noqa
         
         # If there's at least one subfield, change `current_model`
-        # to the next one, checking if the field correspond to a remote field
+        # to the next one, checking if the field correspond to a relation
         if subfields:
-            if getattr(field, "remote_field", None) is None:
+            if not field.is_relation:
                 raise NotARelatedFieldError(current_model, token, censor)
             current_model = field.remote_field.model
     except FieldDoesNotExist:
@@ -289,6 +289,26 @@ def split_list_strings(lst: Iterable[str], sep: str = ',') -> List[str]:
 
 
 
+def is_reverse(field: models.Field) -> bool:
+    """Return `True` if `field` is a reverse relation, `False` otherwise."""
+    return field.auto_created and field.is_relation
+
+
+
+def is_many(field: models.Field) -> bool:
+    """Return `True` if `field` is a relation to multiple instance,
+    `False` otherwise."""
+    return type(field) in MANY_FOREIGN_FIELD
+
+
+
+def is_one(field: models.Field) -> bool:
+    """Return `True` if `field` is a relation to a unique instance,
+    `False` otherwise."""
+    return type(field) in UNIQUE_FOREIGN_FIELD
+
+
+
 def split_related_field(model: Type[models.Model], fields: Iterable[str],
                         arbitrary_fields: Iterable[str] = ()
                         ) -> Tuple[Set[str], Set[str], Set[str]]:
@@ -303,20 +323,22 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
     
     `arbitrary_fields` must be an iterable of the arbitrary fields added by
     `QuerySet`'s method like `annotation()`."""
-    set_fields = set(fields)
+    set_fields = set()
     one_fields = set()
     many_fields = set()
     
-    for field_name in list(set_fields):
+    for field_name in fields:
         if field_name in arbitrary_fields:
+            set_fields.add(field_name)
             continue
-        field = model._meta.get_field(field_name)  # noqa
-        if type(field) in UNIQUE_FOREIGN_FIELD:
-            set_fields.discard(field_name)
+        
+        field = model._meta.get_field(field_name)
+        if is_one(field):
             one_fields.add(field_name)
-        elif type(field) in MANY_FOREIGN_FIELD:
-            set_fields.discard(field_name)
+        elif is_many(field):
             many_fields.add(field_name)
+        else:
+            set_fields.add(field_name)
     
     return set_fields, one_fields, many_fields
 
@@ -342,7 +364,6 @@ def serialize_row(instance: models.Model, fields: Iterable[str] = (),
         joins = dict()
     
     row = {f: getattr(instance, f) for f in fields}
-    
     for f in one_fields:
         if f in joins.keys():
             row[f] = joins[f].fetch(instance)
@@ -355,7 +376,6 @@ def serialize_row(instance: models.Model, fields: Iterable[str] = (),
             row[f] = joins[f].fetch(instance)
         else:
             row[f] = list(map(lambda o: o.pk, getattr(instance, f).all()))
-    
     return row
 
 
@@ -367,9 +387,10 @@ def serialize(user: [User, AnonymousUser], instance: models.Model,
     a row."""
     model = instance.__class__
     include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
-    fields = [
-        f.name for f in model._meta.get_fields(include_hidden=include_hidden)
-    ]
+    fields = {
+        f.get_accessor_name() if is_reverse(f) else f.name
+        for f in model._meta.get_fields(include_hidden=include_hidden)
+    }
     fields = Censor(user, public_fields, private_fields, use_permissions).censor(model, fields)
     fields, one_fields, many_fields = split_related_field(model, fields)
     

@@ -343,7 +343,10 @@ class Show(Command):
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
         # Reset fields so that previous hide or show does not affect this one
-        query.fields = {f.name for f in query.model._meta.get_fields()}  # noqa
+        query.fields = {
+            f.get_accessor_name() if utils.is_reverse(f) else f.name
+            for f in query.model._meta.get_fields()
+        }
         
         fields = utils.split_list_strings(values)
         for f in fields:

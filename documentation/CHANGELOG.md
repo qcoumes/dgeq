@@ -1,5 +1,9 @@
 # CHANGELOG
 
+#### 0.3.3
+
+* Reverse field's name are now correctly fetched
+
 #### 0.3.2
 
 * Joins now correctly account for nullable foreign key

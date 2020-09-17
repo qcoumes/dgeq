@@ -62,7 +62,10 @@ class UnknownFieldError(DgeqError):
         
         self.model = model
         self.unknown = unknown
-        self.valid_fields = [f.name for f in model._meta.get_fields(include_hidden=include_hidden)]
+        self.valid_fields = [
+            f.get_accessor_name() if f.auto_created and f.is_relation else f.name
+            for f in model._meta.get_fields(include_hidden=include_hidden)
+        ]
         self.valid_fields = list(censor.censor(model, self.valid_fields))
     
     
@@ -89,8 +92,8 @@ class NotARelatedFieldError(DgeqError):
         self.model_name = model.__name__
         self.field = field
         self.foreign_fields = [
-            f.name for f in model._meta.get_fields(include_hidden=include_hidden) if
-            f.remote_field is not None
+            f.get_accessor_name() if f.auto_created else f.name
+            for f in model._meta.get_fields(include_hidden=include_hidden) if f.is_relation
         ]
         self.foreign_fields = list(censor.censor(model, self.foreign_fields))
     

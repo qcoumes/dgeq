@@ -112,7 +112,10 @@ class GenericQuery(JoinMixin):
         
         self.model = model
         self.censor = Censor(user, public_fields, private_fields, use_permissions)
-        self.fields = {f.name for f in model._meta.get_fields()}  # noqa
+        self.fields = {
+            f.get_accessor_name() if utils.is_reverse(f) else f.name
+            for f in model._meta.get_fields()
+        }  # noqa
         self.arbitrary_fields = set()
         self.queryset = self.model.objects.all()
         self.result = {'status': True}

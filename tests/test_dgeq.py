@@ -46,8 +46,8 @@ class DgeqTestCase(TestCase):
         query_dict = QueryDict(
             "c:annotate=field=countries|func=count|to=eu_countries_count"
             "|filters=countries.region.continent.name=Europe|early=1"
-            "&eu_countries_count=[3&c:show=name,countries&c:limit=0"
-            "&c:join=field=countries|show=name"
+            "&eu_countries_count=[3&c:show=name,eu_countries_count,countries"
+            "&c:limit=0&c:join=field=countries|show=name"
         )
         dgeq = GenericQuery(self.user, River, query_dict)
         res = dgeq.evaluate()
