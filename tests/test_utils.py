@@ -101,23 +101,23 @@ class GetFieldTestCase(TestCase):
     
     
     def test_field(self):
-        field = utils.get_field("name", Country, self.censor)
-        self.assertEqual(Country._meta.get_field("name"), field)
+        field = utils.get_field_recursive("name", Country, self.censor)
+        self.assertEqual(utils.get_field("name", Country), field)
     
     
     def test_foreign_field(self):
-        field = utils.get_field("rivers", Country, self.censor)
-        self.assertEqual(Country._meta.get_field("rivers"), field)
+        field = utils.get_field_recursive("rivers", Country, self.censor)
+        self.assertEqual(utils.get_field("rivers", Country), field)
     
     
     def test_field_related(self):
-        field = utils.get_field("rivers.length", Country, self.censor)
-        self.assertEqual(River._meta.get_field("length"), field)
+        field = utils.get_field_recursive("rivers.length", Country, self.censor)
+        self.assertEqual(utils.get_field("length", River), field)
     
     
     def test_foreign_field_related(self):
-        field = utils.get_field("rivers.countries", Country, self.censor)
-        self.assertEqual(River._meta.get_field("countries"), field)
+        field = utils.get_field_recursive("rivers.countries", Country, self.censor)
+        self.assertEqual(utils.get_field("countries", River), field)
 
 
 

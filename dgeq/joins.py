@@ -30,7 +30,7 @@ class JoinMixin:
     
     def add_field(self, field_name):
         """Add this field to an existing join."""
-        field = self.model._meta.get_field(field_name)
+        field = utils.get_field(field_name, self.model)
         if utils.is_one(field):
             self.one_fields.add(field_name)
         else:
@@ -54,7 +54,7 @@ class JoinMixin:
             # Create the intermediary `Join` if needed, only add the new field
             # otherwise
             if current not in self.joins:
-                target = utils.get_field(base_name, model, censor, sep)
+                target = utils.get_field_recursive(base_name, model, censor, sep)
                 self.joins[current] = JoinQuery(target, base_name, censor, False, [field_name])
             else:
                 self.joins[current].add_field(field_name)
@@ -111,7 +111,7 @@ class JoinQuery(JoinMixin):
         self.one_fields = set()
         self.many_fields = set()
         for field_name in list(self.fields):
-            field = target_model._meta.get_field(field_name)  # noqa
+            field = utils.get_field(field_name, self.model)
             if utils.is_one(field):
                 self.fields.discard(field_name)
                 self.one_fields.add(field_name)
@@ -135,7 +135,7 @@ class JoinQuery(JoinMixin):
         second_last_model, last_field_name = utils.check_field(
             query_dict["field"], model, censor, arbitrary_fields
         )
-        field = second_last_model._meta.get_field(last_field_name)
+        field = utils.get_field(last_field_name, second_last_model)
         if not field.is_relation:
             raise NotARelatedFieldError(second_last_model, query_dict['field'], censor)
         target = field

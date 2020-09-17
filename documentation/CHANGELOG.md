@@ -1,5 +1,9 @@
 # CHANGELOG
 
+#### 0.3.4
+
+* Fix an exception when no related_name is given on a related field
+
 #### 0.3.3
 
 * Reverse field's name are now correctly fetched

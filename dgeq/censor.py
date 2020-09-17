@@ -43,7 +43,9 @@ class Censor:
         current user."""
         if self.use_permissions:
             try:
-                field_instance = model._meta.get_field(field)
+                field_instance = model._meta.get_field(
+                    field if not field.endswith("_set") else field[:-4]
+                )
             except FieldDoesNotExist:
                 raise UnknownFieldError(model, field, self)
             if field_instance.is_relation:

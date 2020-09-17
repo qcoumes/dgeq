@@ -49,8 +49,18 @@ UNIQUE_FOREIGN_FIELD = (models.OneToOneRel, models.OneToOneField, models.Foreign
 
 
 
+def get_field(field: str, model: Type[models.Model]) -> models.Field:
+    """Return the field named `field` of the given `Model`.
+    
+    Also work on reverse fields. The default name used by reverse fields
+    (`[model]_set`) does not correspond to the actual name of the field when
+    using `[model]._meta.get_field()`."""
+    return model._meta.get_field(field if not field.endswith("_set") else field[:-4])
+
+
+
 def _check_field(fields: List[str], current_model: Type[models.Model], censor: Censor,
-                 arbitrary_fields: Iterable[str] = ()) -> Tuple[models.Model, str]:
+                 arbitrary_fields: Iterable[str] = ()) -> Tuple[Type[models.Model], str]:
     """Recursively check fields.
     
     Wrapped by `check_field()`, see `check_field()` docstring for more
@@ -70,7 +80,7 @@ def _check_field(fields: List[str], current_model: Type[models.Model], censor: C
                 field.is_relation = False
                 break
         else:
-            field = current_model._meta.get_field(token)  # noqa
+            field = get_field(token, current_model)
         
         # If there's at least one subfield, change `current_model`
         # to the next one, checking if the field correspond to a relation
@@ -90,7 +100,7 @@ def _check_field(fields: List[str], current_model: Type[models.Model], censor: C
 
 
 def check_field(field: str, model: Type[models.Model], censor: Censor,
-                arbitrary_fields: Iterable[str] = (), sep=".") -> Tuple[models.Model, str]:
+                arbitrary_fields: Iterable[str] = (), sep=".") -> Tuple[Type[models.Model], str]:
     """Recursively check that a field exists foreign field.
     
     `arbitrary_fields` can be a list of string indicating arbitrary field added
@@ -125,8 +135,8 @@ def check_field(field: str, model: Type[models.Model], censor: Censor,
 
 
 
-def get_field(field: str, model: Type[models.Model], censor: Censor,
-              sep=".") -> Union[models.Field, ForeignField]:
+def get_field_recursive(field: str, model: Type[models.Model], censor: Censor,
+                        sep=".") -> Union[models.Field, ForeignField]:
     """Return the instance of `models.Field` corresponding to `field` inside
     `model`.
     
@@ -138,7 +148,7 @@ def get_field(field: str, model: Type[models.Model], censor: Censor,
     May raise the same exceptions as `check_field()`.
     """
     second_last_model, last_field_name = check_field(field, model, censor, sep=sep)
-    return second_last_model._meta.get_field(last_field_name)
+    return get_field(last_field_name, second_last_model)
 
 
 
@@ -332,7 +342,7 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
             set_fields.add(field_name)
             continue
         
-        field = model._meta.get_field(field_name)
+        field = get_field(field_name, model)
         if is_one(field):
             one_fields.add(field_name)
         elif is_many(field):
