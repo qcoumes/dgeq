@@ -294,7 +294,8 @@ class SerializeRowTestCase(TestCase):
             ]
         }
         self.assertEqual(expected, row)
-
+    
+    
     def test_serialize_row_no_join(self):
         c = Country.objects.get(pk=1)
         row = utils.serialize_row(
@@ -329,8 +330,13 @@ class SerializeTestCase(TestCase):
             Country: ["area", "mountains"]
         }, user=user, use_permissions=True)
         res = dgeq.evaluate()
-        row = utils.serialize(user, c, use_permissions=True, private_fields={
+        row = utils.serialize(c, private_fields={
             Country: ["area", "mountains"]
-        })
+        }, user=user, use_permissions=True)
         
         self.assertEqual(res["rows"][0], row)
+    
+    
+    def test_serialize_permission_true_user_none(self):
+        with self.assertRaises(ValueError):
+            utils.serialize(Country.objects.get(pk=1), use_permissions=True)

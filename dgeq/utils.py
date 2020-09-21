@@ -390,11 +390,14 @@ def serialize_row(instance: models.Model, fields: Iterable[str] = (),
 
 
 
-def serialize(user: [User, AnonymousUser], instance: models.Model,
-              public_fields: FieldMapping = None, private_fields: FieldMapping = None,
+def serialize(instance: models.Model, public_fields: FieldMapping = None,
+              private_fields: FieldMapping = None, user: [User, AnonymousUser] = None,
               use_permissions: bool = False) -> Dict[str, Any]:
     """Serialize an `instance` the same way `dgeq.GenericQuery` would serialize
     a row."""
+    if use_permissions and user is None:
+        raise ValueError("user should be provided if use_permissions is set to True")
+    
     model = instance.__class__
     include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
     fields = {

@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+#### 0.3.7
+
+* `user` argument is now mandatory only when `use_permission=True` in `utils.serialize`
+
 #### 0.3.6
 
 * `user` argument is now mandatory only when `use_permission=True`
