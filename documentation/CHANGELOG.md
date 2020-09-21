@@ -1,13 +1,18 @@
 # CHANGELOG
 
+
+#### 0.3.6
+
+* `user` argument is now mandatory only when `use_permission=True`
+
 #### 0.3.5
 
-* Fix an error occurring when a ForeignField is None
+* Fix an error occurring when a `ForeignField` is None
 * User's password are private by default
 
 #### 0.3.4
 
-* Fix an exception when no related_name is given on a related field
+* Fix an exception when no `related_name` is given on a related field
 
 #### 0.3.3
 

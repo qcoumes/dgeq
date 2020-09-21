@@ -10,14 +10,14 @@ on:
       - master
       - '*.*.*'
   schedule:
-    - cron:  '0 6 * * 1'
+    - cron: '0 6 * * 1'
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: [ 3.8 ]
 
     steps:
       - uses: actions/checkout@v2
@@ -44,7 +44,7 @@ jobs:
         if: matrix.python-version == 3.8
         uses: codecov/codecov-action@v1
         with:
-         file: ./coverage.xml
+          file: ./coverage.xml
 
   publish:
     runs-on: ubuntu-latest
@@ -68,4 +68,3 @@ jobs:
         with:
           password: ${{ secrets.pypi_password }}
           skip_existing: true
-

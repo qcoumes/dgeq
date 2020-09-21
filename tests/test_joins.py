@@ -19,7 +19,7 @@ class JoinMixinTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_add_join_current_model(self):
@@ -99,7 +99,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_join_from_query_ok(self):

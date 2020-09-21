@@ -17,12 +17,12 @@ class DgeqTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_dgeq_error(self):
         query_dict = QueryDict("c:case=invalid")
-        dgeq = GenericQuery(self.user, Country, query_dict)
+        dgeq = GenericQuery(Country, query_dict)
         res = dgeq.evaluate()
         self.assertEqual(False, res["status"])
         self.assertEqual("INVALID_COMMAND_ERROR", res["code"])
@@ -32,7 +32,7 @@ class DgeqTestCase(TestCase):
     
     def test_evaluate_simple(self):
         query_dict = QueryDict("name=Germany")
-        dgeq = GenericQuery(self.user, Country, query_dict)
+        dgeq = GenericQuery(Country, query_dict)
         res = dgeq.evaluate()
         self.assertEqual(True, res["status"])
         self.assertEqual(Country.objects.get(name="Germany").id, res["rows"][0]["id"])
@@ -49,7 +49,7 @@ class DgeqTestCase(TestCase):
             "&eu_countries_count=[3&c:show=name,eu_countries_count,countries"
             "&c:limit=0&c:join=field=countries|show=name"
         )
-        dgeq = GenericQuery(self.user, River, query_dict)
+        dgeq = GenericQuery(River, query_dict)
         res = dgeq.evaluate()
         expected = {
             'status': True,
@@ -141,7 +141,7 @@ class DgeqTestCase(TestCase):
             "c:annotate=field=mountains.height|func=sum|to=sum_mountains_height|early=1"
             "&sum_mountains_height=>100000&c:show=name,id,area&c:sort=name"
         )
-        dgeq = GenericQuery(self.user, Country, query_dict)
+        dgeq = GenericQuery(Country, query_dict)
         res = dgeq.evaluate()
         expected = {
             "status": True,
@@ -224,7 +224,7 @@ class DgeqTestCase(TestCase):
             "&c:join=field=continent|show=name"
             "&c:join=field=countries|show=name|sort=population|limit=1"
         )
-        dgeq = GenericQuery(self.user, Region, query_dict)
+        dgeq = GenericQuery(Region, query_dict)
         res = dgeq.evaluate()
         expected = {
             "status": True,
@@ -292,7 +292,8 @@ class DgeqTestCase(TestCase):
             ]
         }
         self.assertEqual(expected, res)
-
+    
+    
     def test_advanced_4(self):
         """Count if there is at least five regions where the country with the
         lowest population is less more 100000.
@@ -303,18 +304,18 @@ class DgeqTestCase(TestCase):
             "c:annotate=field=countries.population|func=min|to=pop_min|early=1"
             "&pop_min=>10000&c:evaluate=0&c:sort=pop_min&c:count=1&c:limit=5"
         )
-        dgeq = GenericQuery(self.user, Region, query_dict)
+        dgeq = GenericQuery(Region, query_dict)
         res = dgeq.evaluate()
         expected = {
             "status": True,
-            "count": 5
+            "count":  5
         }
         self.assertEqual(expected, res)
     
     
     def test_private(self):
         query_dict = QueryDict("c:join=field=rivers&c:sort=name&c:limit=1")
-        dgeq = GenericQuery(self.user, Country, query_dict, private_fields={
+        dgeq = GenericQuery(Country, query_dict, private_fields={
             River:   ["countries", "discharge"],
             Country: ["forests", "mountains", "disasters"]
         })
@@ -348,7 +349,7 @@ class DgeqTestCase(TestCase):
     
     def test_private_cause_unknown_field(self):
         query_dict = QueryDict("population=>100000000")
-        dgeq = GenericQuery(self.user, Country, query_dict, private_fields={Country: ["population"]})
+        dgeq = GenericQuery(Country, query_dict, private_fields={Country: ["population"]})
         res = dgeq.evaluate()
         self.assertIn("code", res)
         self.assertEqual("UNKNOWN_FIELD", res["code"])
@@ -356,7 +357,7 @@ class DgeqTestCase(TestCase):
     
     def test_public(self):
         query_dict = QueryDict("c:join=field=rivers&c:sort=name&c:limit=1")
-        dgeq = GenericQuery(self.user, Country, query_dict, public_fields={
+        dgeq = GenericQuery(Country, query_dict, public_fields={
             River:   ["length", "id", "name"],
             Country: ["area", "id", "population", "name", "region", "rivers"]
         })
@@ -390,7 +391,7 @@ class DgeqTestCase(TestCase):
     
     def test_public_cause_unknown_field(self):
         query_dict = QueryDict("area=>100000000")
-        dgeq = GenericQuery(self.user, Country, query_dict, public_fields={Country: ["population"]})
+        dgeq = GenericQuery(Country, query_dict, public_fields={Country: ["population"]})
         res = dgeq.evaluate()
         self.assertIn("code", res)
         self.assertEqual("UNKNOWN_FIELD", res["code"])
@@ -401,9 +402,9 @@ class DgeqTestCase(TestCase):
         user = User.objects.create_user("test")
         user.user_permissions.add(Permission.objects.get(codename='view_country'))
         user.user_permissions.add(Permission.objects.get(codename='view_river'))
-        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True, private_fields={
+        dgeq = GenericQuery(Country, query_dict, private_fields={
             River: ["discharge", "countries"]
-        })
+        }, user=user, use_permissions=True)
         res = dgeq.evaluate()
         expected = {
             "status": True,
@@ -435,14 +436,14 @@ class DgeqTestCase(TestCase):
         query_dict = QueryDict("rivers.length=>1000")
         user = User.objects.create_user("test")
         user.user_permissions.add(Permission.objects.get(codename='view_country'))
-        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True)
+        dgeq = GenericQuery(Country, query_dict, user=user, use_permissions=True)
         res = dgeq.evaluate()
         self.assertIn("code", res)
         self.assertEqual("UNKNOWN_FIELD", res["code"])
     
     
     def test__evaluate_each_field_type(self):
-        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq = GenericQuery(Country, QueryDict())
         dgeq.fields = {"name", "population", "rivers", "region", "rivers_length_avg"}
         dgeq.arbitrary_fields = {"rivers_length_avg"}
         dgeq.queryset = Country.objects.all().annotate(rivers_length_avg=models.Avg("rivers__length"))
@@ -451,7 +452,7 @@ class DgeqTestCase(TestCase):
     
     
     def test__evaluate_no_related(self):
-        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq = GenericQuery(Country, QueryDict())
         dgeq.fields = {"name", "population", "rivers", "region"}
         dgeq.arbitrary_fields = set()
         dgeq.queryset = Country.objects.all()
@@ -461,7 +462,7 @@ class DgeqTestCase(TestCase):
     
     
     def test__evaluate_joins(self):
-        dgeq = GenericQuery(self.user, Country, QueryDict())
+        dgeq = GenericQuery(Country, QueryDict())
         dgeq.fields = {"name", "population", "rivers", "region"}
         dgeq.arbitrary_fields = set()
         dgeq.queryset = Country.objects.all()
@@ -473,3 +474,8 @@ class DgeqTestCase(TestCase):
         
         rows = dgeq._evaluate()
         self.assertEqual(Country.objects.all().count(), len(rows))
+    
+    
+    def test_permission_true_user_none(self):
+        with self.assertRaises(ValueError):
+            GenericQuery(Country, QueryDict(), use_permissions=True)

@@ -102,16 +102,20 @@ class GenericQuery(JoinMixin):
     result: Dict[str, Any]
     
     
-    def __init__(self, user: Union[User, AnonymousUser], model: Type[models.Model],
-                 query_dict: QueryDictType, public_fields: utils.FieldMapping = None,
-                 private_fields: utils.FieldMapping = None, use_permissions: bool = False):
+    def __init__(self, model: Type[models.Model], query_dict: QueryDictType,
+                 public_fields: utils.FieldMapping = None,
+                 private_fields: utils.FieldMapping = None,
+                 user: Union[User, AnonymousUser] = None, use_permissions: bool = False):
+        if use_permissions and user is None:
+            raise ValueError("user should be provided if use_permissions is set to True")
+        
         super().__init__()
         
         self._query_dict_list = list(query_dict.lists())
         self._time = time.time()
         
         self.model = model
-        self.censor = Censor(user, public_fields, private_fields, use_permissions)
+        self.censor = Censor(public_fields, private_fields, user, use_permissions)
         self.fields = {
             f.get_accessor_name() if utils.is_reverse(f) else f.name
             for f in model._meta.get_fields()

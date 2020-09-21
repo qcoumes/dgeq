@@ -30,7 +30,7 @@ class CheckFieldTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_model(self):
@@ -97,7 +97,7 @@ class GetFieldTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_field(self):
@@ -264,7 +264,7 @@ class SerializeRowTestCase(TestCase):
             c, ["name", "population"], ["region"], ["rivers", "mountains"],
             {
                 "rivers": JoinQuery.from_query_value(
-                    "field=rivers", Country, False, Censor(AnonymousUser())
+                    "field=rivers", Country, False, Censor(user=AnonymousUser())
                 )
             }
         )
@@ -325,9 +325,9 @@ class SerializeTestCase(TestCase):
         user.user_permissions.add(Permission.objects.get(codename='view_country'))
         user.user_permissions.add(Permission.objects.get(codename='view_region'))
         user.user_permissions.add(Permission.objects.get(codename='view_river'))
-        dgeq = GenericQuery(user, Country, query_dict, use_permissions=True, private_fields={
+        dgeq = GenericQuery(Country, query_dict, private_fields={
             Country: ["area", "mountains"]
-        })
+        }, user=user, use_permissions=True)
         res = dgeq.evaluate()
         row = utils.serialize(user, c, use_permissions=True, private_fields={
             Country: ["area", "mountains"]

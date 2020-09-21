@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Type, Union
+from typing import Dict, Iterable, Optional, Type, Union
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
@@ -36,10 +36,12 @@ class Censor:
     """
     
     
-    def __init__(self, user: Union[User, AnonymousUser],
-                 public: Dict[Type[models.Model], Iterable[str]] = None,
+    def __init__(self, public: Dict[Type[models.Model], Iterable[str]] = None,
                  private: Dict[Type[models.Model], Iterable[str]] = None,
-                 use_permissions=False):
+                 user: Union[User, AnonymousUser] = None, use_permissions=False):
+        if use_permissions and user is None:
+            raise ValueError("user should be provided if use_permissions is set to True")
+        
         self.user = user
         self.public = public or dict()
         self.private = private or dict()

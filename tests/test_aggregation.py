@@ -19,7 +19,7 @@ class AggregationTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_functions(self):
@@ -128,7 +128,7 @@ class AnnotationTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = AnonymousUser()
-        cls.censor = Censor(cls.user)
+        cls.censor = Censor(user=cls.user)
     
     
     def test_functions(self):

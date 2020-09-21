@@ -401,7 +401,7 @@ def serialize(user: [User, AnonymousUser], instance: models.Model,
         f.get_accessor_name() if is_reverse(f) else f.name
         for f in model._meta.get_fields(include_hidden=include_hidden)
     }
-    fields = Censor(user, public_fields, private_fields, use_permissions).censor(model, fields)
+    fields = Censor(public_fields, private_fields, user, use_permissions).censor(model, fields)
     fields, one_fields, many_fields = split_related_field(model, fields)
     
     row = {f: getattr(instance, f) for f in fields}
