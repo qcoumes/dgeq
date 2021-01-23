@@ -12,6 +12,8 @@ from django_dummy_app.models import Country, Forest
 
 
 class AnnotationTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
     
     @classmethod
     def setUpTestData(cls):
@@ -19,16 +21,26 @@ class AnnotationTestCase(TestCase):
     
     
     def test_annotate(self):
-        subquery = "field=rivers.length|func=avg|to=rivers_length_avg|filters=rivers.length=<1500|early=0"
+        subquery = "field=rivers.length|func=avg|to=river_length|filters=rivers.length=>3000|early=0"
         dgeq = GenericQuery(Country, QueryDict())
         commands.Annotate()(dgeq, "c:annotate", [subquery])
-        func = models.Avg("rivers__length", filter=models.Q(rivers__length__lt=1500))
-        queryset = Country.objects.all().annotate(population_avg=func)
-        self.assertEqual(queryset.query, dgeq.queryset.query)
+        
+        queryset = Country.objects.all().annotate(
+            river_length=models.Avg("rivers__length", filter=models.Q(rivers__length__gt=3000))
+        )
+        self.assertGreater(queryset.count(), 0)
+        self.assertEqual(queryset.count(), dgeq.queryset.count())
+        for c1, c2 in zip(queryset, dgeq.queryset):
+            self.assertEqual(c1, c2)
+            self.assertTrue(hasattr(c1, "river_length"))
+            self.assertTrue(hasattr(c2, "river_length"))
+            self.assertEqual(c1.river_length, c2.river_length)
 
 
 
 class AggregateTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
     
     @classmethod
     def setUpTestData(cls):
@@ -50,6 +62,8 @@ class AggregateTestCase(TestCase):
 
 
 class CaseTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
     
     @classmethod
     def setUpTestData(cls):
@@ -77,6 +91,8 @@ class CaseTestCase(TestCase):
 
 
 class CountTestCase(TestCase):
+    fixtures = ["tests/django_dummy_app/geography_data.json"]
+    
     
     @classmethod
     def setUpTestData(cls):

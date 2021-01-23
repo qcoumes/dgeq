@@ -23,17 +23,8 @@ QueryDictType = Union[QueryDict, Type[QueryDict]]
 class GenericQuery(JoinMixin):
     """Main class of the `dgeq` module.
     
-    `public_fields` and `private_fields` allow the definition of *private* and
-    *public* field specific model. For each model, only the field defined in
-    public, or not defined in private, will be present in the resulting rows.
-    If both private and public field are defined for a same model, only the
-    public definition will be used.
-    One can also decide to use django's permission implementation. Dgeq will
-    check for the `view_[model]` permission for each related field.
-    Note that permission can be used in conjunction with private and public
-    field.
-    If the user manually try to access a private field (or is missing a
-    permission), an error will be raised as if the field didn't exists.
+    For the explanation of `public_fields` and `private_fields`, see
+    `censor.Censor`.
     
     To use it in a view, you need to create an instance with the corresponding
     `Model` and the requests' `QueryDict` and execute its `evaluate()` method :
@@ -69,7 +60,6 @@ class GenericQuery(JoinMixin):
         request.user, models.Continent, request.GET, public_fields=public
     )
     ```
-    
     """
     
     result: Dict[str, Any]

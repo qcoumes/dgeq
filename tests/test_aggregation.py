@@ -1,7 +1,9 @@
+import django
 from django.contrib.auth.models import AnonymousUser
 from django.db import models
 from django.db.models import Q
 from django.test import TestCase
+from packaging import version
 
 from dgeq import utils
 from dgeq.aggregations import Aggregation, Annotation, DistinctCount
@@ -28,20 +30,25 @@ class AggregationTestCase(TestCase):
             Aggregation("population", "population_min", models.Min),
             Aggregation("population", "population_avg", models.Avg),
             Aggregation("population", "population_sum", models.Sum),
-            Aggregation("population", "population_stddev", models.StdDev),
-            Aggregation("population", "population_var", models.Variance),
             Aggregation("population", "population_cnt", models.Count),
         ]
-        aggregations = [a.get() for a in aggregations]
-        kwargs = dict(aggregations)
-        query = Country.objects.all().aggregate(**kwargs)
-        
         expected = Country.objects.all().aggregate(
             population_max=models.Max("population"), population_min=models.Min("population"),
             population_avg=models.Avg("population"), population_sum=models.Sum("population"),
-            population_cnt=models.Count("population"), population_var=models.Variance("population"),
-            population_stddev=models.StdDev("population")
+            population_cnt=models.Count("population"),
         )
+        
+        if version.parse(".".join(map(str, django.VERSION))) >= version.parse("2.2.0"):
+            aggregations.append(Aggregation("population", "population_stddev", models.StdDev))
+            aggregations.append(Aggregation("population", "population_var", models.Variance), )
+            expected = expected.aggregate(
+                population_stddev=models.StdDev("population"),
+                population_var=models.Variance("population")
+            )
+        
+        aggregations = [a.get() for a in aggregations]
+        kwargs = dict(aggregations)
+        query = Country.objects.all().aggregate(**kwargs)
         self.assertEqual(expected, query)
     
     
@@ -134,7 +141,7 @@ class AnnotationTestCase(TestCase):
     def test_functions(self):
         attributes = [
             "rivers_length_max", "rivers_length_min", "rivers_length_avg", "rivers_length_sum",
-            "rivers_length_dcnt", "rivers_length_cnt", # "rivers_length_stddev", "rivers_length_var"
+            "rivers_length_dcnt", "rivers_length_cnt",  # "rivers_length_stddev", "rivers_length_var"
         ]
         annotations = [
             Annotation("rivers__length", "rivers_length_max", models.Max),

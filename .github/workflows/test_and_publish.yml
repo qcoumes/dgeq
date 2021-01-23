@@ -36,15 +36,16 @@ jobs:
 
       - name: Setup Test Project
         run: |
-          pip3 install dateutils "django~=${{ matrix.django-version }}" tox coverage
           python3 manage.py makemigrations
           python3 manage.py migrate
 
       - name: Run Tox
-        run: tox -e py
+        env:
+          TOX_ENV: py${{ matrix.python-version}}-django${{ matrix.django-version }}
+        run: tox -e $TOX_ENV
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == 3.8
+        if: matrix.python-version == 3.9 && matrix.django-version == 3.1
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage.xml
