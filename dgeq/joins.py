@@ -149,11 +149,13 @@ class JoinQuery(JoinMixin):
         [utils.check_field(f, target_model, censor, arbitrary_fields) for f in hide]
         
         # Retrieve start & limit:
-        if not (start := query_dict.get("start", "0")).isdigit():
+        start = query_dict.get("start", "0")
+        if not start.isdigit():
             raise InvalidCommandError(
                 "c:join", f"'start' value must be a non-negative integers (received '{start}')"
             )
-        if not (limit := query_dict.get("limit", "0")).isdigit():
+        limit = query_dict.get("limit", "0")
+        if not limit.isdigit():
             raise InvalidCommandError(
                 "c:join", f"'start' value must be a non-negative integers (received '{limit}')"
             )

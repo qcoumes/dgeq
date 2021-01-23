@@ -53,13 +53,14 @@ class UnknownFieldError(DgeqError):
     command."""
     
     code = "UNKNOWN_FIELD"
-    details = ['valid_fields', 'unknown']
+    details = ['valid_fields', 'unknown', 'table']
     
     
     def __init__(self, model: Type[models.Model], unknown: str, censor: 'Censor'):
         include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
         
         self.model = model
+        self.table = model.__name__
         self.unknown = unknown
         self.valid_fields = [
             f.get_accessor_name() if f.auto_created and f.is_relation else f.name
@@ -70,17 +71,18 @@ class UnknownFieldError(DgeqError):
     
     def __str__(self):
         return (
-            f"Unknown field '{self.unknown}' in table '{self.model.__name__}', valid fields are "
-            f"{self.valid_fields}"
+            f"Unknown field '{self.unknown}' in the table '{self.model.__name__}', valid fields "
+            f"are {self.valid_fields}"
         )
 
 
 
 class NotARelatedFieldError(DgeqError):
-    """Raised when using a field that is not a related field."""
+    """Raised when trying to use a field that is not a related field for
+    operation spanning relationships.."""
     
     code = "NOT_A_RELATED_FIELD"
-    details = ['model_name', 'field', 'foreign_fields']
+    details = ['table', 'field', 'related_fields']
     
     
     def __init__(self, model: Union[Type[models.Model], models.Model], field: str,
@@ -88,25 +90,26 @@ class NotARelatedFieldError(DgeqError):
         include_hidden = getattr(settings, "DGEQ_INCLUDE_HIDDEN", False)
         
         self.model = model
-        self.model_name = model.__name__
+        self.table = model.__name__
         self.field = field
-        self.foreign_fields = [
+        self.related_fields = [
             f.get_accessor_name() if f.auto_created else f.name
             for f in model._meta.get_fields(include_hidden=include_hidden) if f.is_relation
         ]
-        self.foreign_fields = list(censor.censor(model, self.foreign_fields))
+        self.related_fields = list(censor.censor(model, self.related_fields))
     
     
     def __str__(self):
         return (
-            f"Field '{self.field}' in table '{self.model.__name__}, is neither a foreign key nor "
-            f"a list of foreign key. Valid fields are {self.foreign_fields}"
+            f"Field '{self.field}' in table '{self.model.__name__}', is neither a foreign key nor "
+            f"a list of foreign key. Valid fields are {self.related_fields}"
         )
 
 
 
 class FieldDepthError(DgeqError):
-    """Raised if a field lookup exceed `DGEQ_MAX_NESTED_FIELD_DEPTH`."""
+    """Raised if a lookup spanning relationships exceed
+    `DGEQ_MAX_NESTED_FIELD_DEPTH` number of relation."""
     
     code = "FIELD_DEPTH_ERROR"
     details = ['field', 'max_depth']
@@ -119,14 +122,14 @@ class FieldDepthError(DgeqError):
     
     def __str__(self):
         return (
-            f"Field `{self.field}` exceed the allowed depth of related field of"
+            f"Field '{self.field}' exceed the allowed depth of related field of"
             f" {constants.DGEQ_MAX_NESTED_FIELD_DEPTH}"
         )
 
 
 
 class InvalidCommandError(DgeqError):
-    """Raised when a commands is misused or its value is invalid."""
+    """Raised when a command is misused or its value is invalid."""
     
     code = "INVALID_COMMAND_ERROR"
     details = ['command']
@@ -138,4 +141,4 @@ class InvalidCommandError(DgeqError):
     
     
     def __str__(self):
-        return f"Invalid command `{self.command}`: {self.message}"
+        return f"Invalid command '{self.command}': {self.message}"

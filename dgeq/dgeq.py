@@ -1,33 +1,33 @@
 import logging
 import re
 import time
-from typing import Any, Dict, List, Type, Union
+from typing import Any, Dict, List, TYPE_CHECKING, Type, Union
 
-from django.contrib.auth.models import AnonymousUser, User
 from django.db import models
 from django.http import QueryDict
 
 from . import utils
 from .censor import Censor
 from .commands import DGEQ_COMMANDS
+from .constants import DGEQ_DEFAULT_LIMIT
 from .exceptions import DgeqError
 from .joins import JoinMixin
-from .constants import DGEQ_DEFAULT_LIMIT
+
 
 logger = logging.getLogger(__file__)
 
 QueryDictType = Union[QueryDict, Type[QueryDict]]
 
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AnonymousUser, User
 
 class GenericQuery(JoinMixin):
     """Main class of the `dgeq` module.
-    
-    For the explanation of `public_fields` and `private_fields`, see
-    `censor.Censor`.
-    
+
     To use it in a view, you need to create an instance with the corresponding
-    `Model` and the requests' `QueryDict` and execute its `evaluate()` method :
+    `Model` and the `request`'s `QueryDict`, then execute its `evaluate()`
+    method :
     
     ```python
     q = dgeq.GenericQuery(request.user, models.Continent, request.GET)
@@ -43,23 +43,12 @@ class GenericQuery(JoinMixin):
     return JsonResponse(result)
     ```
     
-    If you want to hide the `password` and `email` of `User` :
+    Parameters:
     
-    ```python
-    private = {User : ['password', 'email']}
-    q = dgeq.GenericQuery(
-        request.user, models.Continent, request.GET, private_fields=private
-    )
-    ```
-    
-    If you want to hide everything but the `username` of `User` :
-    
-    ```python
-    public = {User : ['username']}
-    q = dgeq.GenericQuery(
-        request.user, models.Continent, request.GET, public_fields=public
-    )
-    ```
+    * `model` (`Type[models.Model]`) - Queried `Model`.
+    * `query_dict` (`QueryDict`) - Request's `GET` Querydict.
+    * `public_fields`, `private_fields`, `user`, `use_permissions` - Allow to
+      filter which field can be retrieved. See [`Censor`](censor.md).
     """
     
     result: Dict[str, Any]
@@ -68,7 +57,7 @@ class GenericQuery(JoinMixin):
     def __init__(self, model: Type[models.Model], query_dict: QueryDictType,
                  public_fields: utils.FieldMapping = None,
                  private_fields: utils.FieldMapping = None,
-                 user: Union[User, AnonymousUser] = None, use_permissions: bool = False):
+                 user: Union['User', 'AnonymousUser'] = None, use_permissions: bool = False):
         if use_permissions and user is None:
             raise ValueError("user should be provided if use_permissions is set to True")
         

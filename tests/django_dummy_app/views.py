@@ -14,6 +14,13 @@ def continent(request: HttpRequest):
 
 
 @require_GET
+def continent_no_user(request: HttpRequest):
+    q = dgeq.GenericQuery(models.Continent, request.GET)
+    return JsonResponse(q.evaluate())
+
+
+
+@require_GET
 def region(request: HttpRequest):
     q = dgeq.GenericQuery(models.Region, request.GET, user=request.user)
     return JsonResponse(q.evaluate())

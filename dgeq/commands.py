@@ -337,7 +337,7 @@ class Show(Command):
     the `c:show` field to declare a comma separated
     """
     
-    regex = "^c:(show)|(hide)$"
+    regex = "^c:((show)|(hide))$"
     
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
@@ -350,7 +350,7 @@ class Show(Command):
         fields = utils.split_list_strings(values)
         for f in fields:
             utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
-        
+
         if field == "c:show":
             query.fields = set(fields)
         else:

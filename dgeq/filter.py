@@ -87,7 +87,8 @@ class Filter:
         self.field = field.replace(".", "__")
         self.modifier = modifier
         for parser in DGEQ_TYPE_PARSERS:
-            if (v := parser(value)) is not ...:
+            v = parser(value)
+            if v is not ...:
                 self.value = v
                 break
         else:

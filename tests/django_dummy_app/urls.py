@@ -7,6 +7,7 @@ app_name = 'ask'
 
 urlpatterns = [
     path(r'continent/', views.continent, name='continent'),
+    path(r'continent_no_user/', views.continent_no_user, name='continent_no_user'),
     path(r'region/', views.region, name='region'),
     path(r'country/', views.country, name='country'),
     path(r'river/', views.river, name='river'),

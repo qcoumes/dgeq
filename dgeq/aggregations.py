@@ -202,7 +202,8 @@ class Annotation:
             filters.append(Filter(k, v, case))
         
         # Check if this annotation must be delayed
-        if not (early := query_dict.get("early", "0")) in ["0", "1"]:
+        early = query_dict.get("early", "0")
+        if early not in ["0", "1"]:
             raise InvalidCommandError("c:annotate", "'early' argument must be '0' or '1'")
         early = bool(int(early))
         
