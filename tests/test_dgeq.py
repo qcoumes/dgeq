@@ -1,10 +1,12 @@
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.db import models
 from django.http import QueryDict
 from django.test import TestCase
 
-from dgeq import GenericQuery
+from dgeq import GenericQuery, constants
 from dgeq.censor import Censor
+from dgeq.constants import DGEQ_DEFAULT_LIMIT
 from dgeq.joins import JoinQuery
 from django_dummy_app.models import Country, Region, River
 
@@ -302,7 +304,7 @@ class DgeqTestCase(TestCase):
         population."""
         query_dict = QueryDict(
             "c:annotate=field=countries.population|func=min|to=pop_min|early=1"
-            "&pop_min=>10000&c:evaluate=0&c:sort=pop_min&c:count=1&c:limit=5"
+            "&pop_min=>10000&c:evaluate=0&c:sort=pop_min&c:limit=5&c:count=1"
         )
         dgeq = GenericQuery(Region, query_dict)
         res = dgeq.evaluate()
@@ -310,7 +312,7 @@ class DgeqTestCase(TestCase):
             "status": True,
             "count":  5
         }
-        self.assertEqual(expected, res)
+        self.assertDictEqual(expected, res)
     
     
     def test_private(self):
@@ -448,7 +450,7 @@ class DgeqTestCase(TestCase):
         dgeq.arbitrary_fields = {"rivers_length_avg"}
         dgeq.queryset = Country.objects.all().annotate(rivers_length_avg=models.Avg("rivers__length"))
         rows = dgeq._evaluate()
-        self.assertEqual(Country.objects.all().count(), len(rows))
+        self.assertEqual(constants.DGEQ_DEFAULT_LIMIT, len(rows))
     
     
     def test__evaluate_no_related(self):
@@ -458,7 +460,7 @@ class DgeqTestCase(TestCase):
         dgeq.queryset = Country.objects.all()
         dgeq.related = False
         rows = dgeq._evaluate()
-        self.assertEqual(Country.objects.all().count(), len(rows))
+        self.assertEqual(DGEQ_DEFAULT_LIMIT, len(rows))
     
     
     def test__evaluate_joins(self):
@@ -473,7 +475,7 @@ class DgeqTestCase(TestCase):
         dgeq.add_join("region", j_region, Country, self.censor)
         
         rows = dgeq._evaluate()
-        self.assertEqual(Country.objects.all().count(), len(rows))
+        self.assertEqual(DGEQ_DEFAULT_LIMIT, len(rows))
     
     
     def test_permission_true_user_none(self):

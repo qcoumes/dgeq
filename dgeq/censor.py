@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Optional, Type, Union
+from typing import Dict, Iterable, Type, Union
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
@@ -6,14 +6,15 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
-from dgeq.exceptions import UnknownFieldError
+from .exceptions import UnknownFieldError
 
 
-# Fields always private
-DEFAULT_PRIVATE_FIELDS = {
-    User: ["password"]
-}
-DGEQ_PRIVATE_FIELDS = getattr(settings, "DGEQ_PRIVATE_FIELDS", DEFAULT_PRIVATE_FIELDS)
+# Allow to define private and public fields project-wide. See `Censor` for
+# more information.
+DGEQ_PRIVATE_FIELDS = getattr(settings, "DGEQ_PRIVATE_FIELDS", {})
+DGEQ_PUBLIC_FIELDS = getattr(settings, "DGEQ_PUBLIC_FIELDS", {
+    "django.contrib.auth.models.User": ["username"]
+})
 
 
 
@@ -24,13 +25,19 @@ class Censor:
     Censor instance take two dictionary mapping `Model` to a list of
     public / private fields.
     
-    A field will be removed if:
+    A field will be censored if:
     
     * `model` has defined public fields and `field` is not in the list.
     * `model` has defined private fields and `field` is in the list.
     * `field` if a related field, `self.use_permissions` is `True`, and the
        current `user` has not the *view* permission on the related model.
-       
+    
+    Public and private fields can also be defined project-wide in settings.py
+    using `DGEQ_PUBLIC_FIELDS` and `DGEQ_PRIVATE_FIELDS`. If `model` has been
+    defined in both this instance of `Censor` (through `public` and `private`
+    arguments) and in the corresponding settings, the definition in the
+    arguments prevails.
+    
     If `model` has both explicitly defined public and private fields, private
     fields are ignored.
     """
@@ -63,8 +70,11 @@ class Censor:
                 if not self.user.has_perm(f"{content_type.app_label}.view_{content_type.model}"):
                     return True
         
-        if model in DGEQ_PRIVATE_FIELDS and field in DGEQ_PRIVATE_FIELDS[model]:
-            return True
+        if model in DGEQ_PUBLIC_FIELDS:
+            return field not in DGEQ_PUBLIC_FIELDS[model]
+        
+        if model in DGEQ_PRIVATE_FIELDS:
+            return field in DGEQ_PRIVATE_FIELDS[model]
         
         if model in self.public:
             return field not in self.public[model]

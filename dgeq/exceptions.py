@@ -3,12 +3,11 @@ from typing import Any, TYPE_CHECKING, Type, Union
 from django.conf import settings
 from django.db import models
 
+from . import constants
+
 
 if TYPE_CHECKING:
     from .censor import Censor
-
-# Default max depth before a field lookup fail. Can be overridden in settings.py
-MAX_FOREIGN_FIELD_DEPTH = getattr(settings, "DGEQ_MAX_FOREIGN_FIELD_DEPTH", 10)
 
 
 
@@ -107,7 +106,7 @@ class NotARelatedFieldError(DgeqError):
 
 
 class FieldDepthError(DgeqError):
-    """Raised if a field lookup exceed `MAX_FOREIGN_FIELD_DEPTH`."""
+    """Raised if a field lookup exceed `DGEQ_MAX_NESTED_FIELD_DEPTH`."""
     
     code = "FIELD_DEPTH_ERROR"
     details = ['field', 'max_depth']
@@ -115,13 +114,13 @@ class FieldDepthError(DgeqError):
     
     def __init__(self, field: str):
         self.field = field
-        self.max_depth = MAX_FOREIGN_FIELD_DEPTH
+        self.max_depth = constants.DGEQ_MAX_NESTED_FIELD_DEPTH
     
     
     def __str__(self):
         return (
             f"Field `{self.field}` exceed the allowed depth of related field of"
-            f" {MAX_FOREIGN_FIELD_DEPTH}"
+            f" {constants.DGEQ_MAX_NESTED_FIELD_DEPTH}"
         )
 
 

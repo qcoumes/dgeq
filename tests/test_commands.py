@@ -4,6 +4,7 @@ from django.http import QueryDict
 from django.test import TestCase
 
 from dgeq import GenericQuery, commands
+from dgeq.constants import DGEQ_MAX_LIMIT
 from dgeq.exceptions import InvalidCommandError
 from dgeq.utils import Censor
 from django_dummy_app.models import Country, Forest
@@ -416,6 +417,10 @@ class SubsetTestCase(TestCase):
         dgeq = GenericQuery(Country, QueryDict())
         with self.assertRaises(InvalidCommandError):
             commands.Subset()(dgeq, "c:start", values)
+        
+        dgeq = GenericQuery(Country, QueryDict())
+        with self.assertRaises(InvalidCommandError):
+            commands.Subset()(dgeq, "c:limit", [f"{DGEQ_MAX_LIMIT + 1}"])
 
 
 
@@ -431,8 +436,8 @@ class TimeTestCase(TestCase):
     def test_time(self):
         values = ["1"]
         dgeq = GenericQuery(Country, QueryDict())
-        dgeq._evaluate()
         commands.Time()(dgeq, "c:time", values)
+        dgeq.evaluate()
         self.assertIn("time", dgeq.result)
         self.assertLess(dgeq.result["time"], 2)
     
@@ -440,8 +445,8 @@ class TimeTestCase(TestCase):
     def test_no_time(self):
         values = ["0"]
         dgeq = GenericQuery(Country, QueryDict())
-        dgeq._evaluate()
         commands.Time()(dgeq, "c:time", values)
+        dgeq.evaluate()
         self.assertNotIn("time", dgeq.result)
     
     

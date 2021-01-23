@@ -7,29 +7,32 @@ from django.db.models import QuerySet
 
 from . import utils
 from .censor import Censor
+from .utils import import_class
 from .exceptions import InvalidCommandError, UnknownFieldError
 from .filter import Filter
 
 
-# Function used in aggregation and annotation. New entry can be added by with
-# the setting `DGEQ_AGGREGATION_FUNCTION`. Existing one can be disabled by
-# setting them to `None`.
-DEFAULT_AGGREGATION_FUNCTION = {
-    "max":    models.Max,
-    "min":    models.Min,
-    "avg":    models.Avg,
-    "sum":    models.Sum,
-    "stddev": models.StdDev,
-    "var":    models.Variance,
-    "count":  models.Count,
-    "dcount": utils.DistinctCount,
-}
-AGGREGATION_FUNCTION = {
-    **DEFAULT_AGGREGATION_FUNCTION,
-    **{
-        k: utils.import_callable(v)
-        for k, v in getattr(settings, "DGEQ_AGGREGATION_FUNCTION", dict()).items()
-    },
+
+class DistinctCount(models.Count):
+    """Wrap `models.Count(distinct=True)`."""
+    
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, distinct=True, **kwargs)
+
+
+# Function used in aggregation and annotation.
+DGEQ_AGGREGATION_FUNCTION = {
+    k: import_class(a) for k, a in getattr(settings, "DGEQ_AGGREGATION_FUNCTION", {
+        "max":    models.Max,
+        "min":    models.Min,
+        "avg":    models.Avg,
+        "sum":    models.Sum,
+        "stddev": models.StdDev,
+        "var":    models.Variance,
+        "count":  models.Count,
+        "dcount": "dgeq.aggregations.DistinctCount",
+    }.items())
 }
 
 
@@ -69,13 +72,13 @@ class Aggregation:
         # Retrieve the function used to compute the aggregation
         if "func" not in query_dict:
             raise InvalidCommandError("c:aggregate", "'func' argument is missing")
-        if query_dict["func"] not in AGGREGATION_FUNCTION:
+        if query_dict["func"] not in DGEQ_AGGREGATION_FUNCTION:
             raise InvalidCommandError(
                 "c:aggregate",
                 f"Unknown function '{query_dict['func']}', valid functions are : "
-                f"{list(AGGREGATION_FUNCTION.keys())}"
+                f"{list(DGEQ_AGGREGATION_FUNCTION.keys())}"
             )
-        func = AGGREGATION_FUNCTION[query_dict["func"]]
+        func = DGEQ_AGGREGATION_FUNCTION[query_dict["func"]]
         
         # Retrieve the field where to put the computed aggregation
         if "to" not in query_dict:
@@ -158,13 +161,13 @@ class Annotation:
         # Retrieve the function used to compute the annotation
         if "func" not in query_dict:
             raise InvalidCommandError("c:annotate", "'func' argument is missing")
-        if query_dict["func"] not in AGGREGATION_FUNCTION:
+        if query_dict["func"] not in DGEQ_AGGREGATION_FUNCTION:
             raise InvalidCommandError(
                 "c:annotate",
                 f"Unknown function '{query_dict['func']}', valid functions are : "
-                f"{list(AGGREGATION_FUNCTION.keys())}"
+                f"{list(DGEQ_AGGREGATION_FUNCTION.keys())}"
             )
-        func = AGGREGATION_FUNCTION[query_dict["func"]]
+        func = DGEQ_AGGREGATION_FUNCTION[query_dict["func"]]
         
         # Retrieve the field where to put the computed annotation
         if "to" not in query_dict:

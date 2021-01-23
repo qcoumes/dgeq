@@ -1,7 +1,7 @@
-import time
 from abc import ABC, abstractmethod
 from typing import List, TYPE_CHECKING
 
+from django.conf import settings
 from django.db.models import Q
 
 from . import utils
@@ -15,14 +15,13 @@ if TYPE_CHECKING:
     from .dgeq import GenericQuery
 
 
-
 class Command(ABC):
     """Interface for commands."""
     regex = None
     
     
     @abstractmethod
-    def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+    def __call__(self, query: 'GenericQuery', field: str, values: List[str]) -> None:
         pass
 
 
@@ -36,7 +35,7 @@ class Annotate(Command):
     * `to` (`to=population_avg`) - Name of the field where the result of the
         annotation will be displayed.|
     * `func` (`func=avg`) - Function to use for the annotation. Value must be
-        key of `DGEQ_AGGREGATION_FUNCTION` dictionary.
+        key of `DGEQ_DGEQ_AGGREGATION_FUNCTION` dictionary.
     * `filters` (`filters=mountains.height=]1500'mountains.name=*Mount`) - Allow
         to add an apostrophe `'` separated list of filters. These filters
         support search modifiers.
@@ -95,7 +94,7 @@ class Aggregate(Command):
     * `to` (`to=population_avg`) - Name of the field where the result of the
         aggregation will be displayed.|
     * `func` (`func=avg`) - Function to use for the aggregation. Value must be
-        key of `DGEQ_AGGREGATION_FUNCTION` dictionary.
+        key of `DGEQ_DGEQ_AGGREGATION_FUNCTION` dictionary.
     
     You can declare multiple aggregation using a comma `,` or with multiple
     declaration of `c:aggregate`. Each aggregation's `to` must be unique."""
@@ -212,7 +211,7 @@ class Filtering(Command):
     You can also query on related model using a dot `.` notation. For instance,
     in order to find all the disaster in Kenya, on would use the following pair
     string :`country.name=Kenya`. Related field can be nested up to
-    `DGEQ_MAX_FOREIGN_FIELD_DEPTH`.
+    `DGEQ_MAX_NESTED_FIELD_DEPTH`.
     
     If you query directly on a related model, and not on one of its field
     (E.G. `country` instead of `country.name`), `dgeq` will use it's primary key
@@ -397,32 +396,38 @@ class Subset(Command):
     Use `c:start=N` to include the results from the Nth row (first row is 0),
     default to 0.
     Use `c:limit=N` to include up to N rows. To include every row, set N to 0.
-    Default to 1.
+    Default to `DGEQ_DEFAULT_LIMIT`.
     """
     
     regex = "^c:((start)|(limit))$"
     
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
+        from .constants import DGEQ_MAX_LIMIT
+        
         if field == "c:start":
             if not values[-1].isdigit():
                 raise InvalidCommandError(
                     f'c:start', f"value must be a non-negative integers (received '{values[-1]}')")
+            start = int(values[-1])
+            query.queryset = query.queryset[start:]
+            query.sliced = True
+        
         else:
             if not values[-1].isdigit():
                 raise InvalidCommandError(
                     f'c:limit', f"value must be a non-negative integers (received '{values[-1]}')"
                 )
-        
-        if field == "c:start":
-            start = int(values[-1])
-            query.queryset = query.queryset[start:]
-            query.sliced = True
-        else:
             limit = int(values[-1])
+            if limit > DGEQ_MAX_LIMIT:
+                raise InvalidCommandError(
+                    f'c:limit',
+                    f"value cannot be higher than '{DGEQ_MAX_LIMIT}' (received '{limit}')"
+                )
             if limit:
                 query.queryset = query.queryset[:limit]
             query.sliced = True
+            query.limit_set = True
 
 
 
@@ -440,5 +445,23 @@ class Time(Command):
             raise InvalidCommandError(
                 f'c:time', f"value must be either 0 or 1 (received '{values[-1]}')"
             )
-        if int(values[-1]):
-            query.result["time"] = time.time() - query._time  # noqa
+        query.time = int(values[-1])
+
+
+# Commands used when evaluating the query
+DGEQ_COMMANDS = [
+    utils.import_callable(p) for p in getattr(settings, "DGEQ_COMMANDS", [
+        Case(),
+        Annotate(),
+        Filtering(),
+        Distinct(),
+        Sort(),
+        Subset(),
+        Join(),
+        Show(),
+        Aggregate(),
+        Count(),
+        Time(),
+        Evaluate(),
+    ])
+]

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+#### 0.3.8
+
+* Default and max `c:limit` can now be defined in `settings.py` through `DGEQ_DEFAULT_LIMIT`
+ and `DGEQ_MAX_LIMIT`.
+* Dotted path to models can now be used for `DGEQ_PRIVATE_FIELDS`.
 
 #### 0.3.7
 

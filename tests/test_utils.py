@@ -5,21 +5,12 @@ from django.http import QueryDict
 from django.test import TestCase
 
 from dgeq import GenericQuery, utils
-from dgeq.exceptions import FieldDepthError, MAX_FOREIGN_FIELD_DEPTH, NotARelatedFieldError, UnknownFieldError
+from dgeq.constants import DGEQ_MAX_NESTED_FIELD_DEPTH
+from dgeq.exceptions import FieldDepthError, NotARelatedFieldError, UnknownFieldError
 from dgeq.joins import JoinQuery
 from dgeq.utils import Censor
 from django_dummy_app.models import Country, River
-
-
-
-class DummyCallable:
-    
-    def __init__(self, *args, **kwargs):
-        self.args, self.kwargs = args, kwargs
-    
-    
-    def __call__(self):
-        return self.args, self.kwargs
+from tests.dummy import DummyCallable
 
 
 
@@ -70,7 +61,7 @@ class CheckFieldTestCase(TestCase):
     
     def test_max_depth_exceeded(self):
         with self.assertRaises(FieldDepthError):
-            field = "rivers.countries" + (".rivers.countries" * (MAX_FOREIGN_FIELD_DEPTH // 2))
+            field = "rivers.countries" + (".rivers.countries" * (DGEQ_MAX_NESTED_FIELD_DEPTH // 2))
             utils.check_field(field, Country, self.censor)
     
     
@@ -87,6 +78,109 @@ class CheckFieldTestCase(TestCase):
     def test_unknown_field_model_related_loop(self):
         with self.assertRaises(UnknownFieldError):
             utils.check_field("rivers.countries.unknown", Country, self.censor)
+
+
+
+class ImportClassTestCase(TestCase):
+    
+    def test_import_class(self):
+        self.assertTrue(isinstance(utils.import_class(DummyCallable)(), DummyCallable))
+    
+    
+    def test_import_str(self):
+        self.assertTrue(
+            isinstance(utils.import_class("tests.dummy.DummyCallable")(), DummyCallable)
+        )
+    
+    
+    def test_import_class_not_valid(self):
+        with self.assertRaises(ValueError):
+            utils.import_class(reduce)()
+    
+    
+    def test_import_str_not_valid(self):
+        with self.assertRaises(ValueError):
+            utils.import_class("functools.reduce")()
+
+
+
+class ImportCallableTestCase(TestCase):
+    
+    def test_import_function(self):
+        self.assertEqual(len, utils.import_callable(len))
+    
+    
+    def test_import_function_path(self):
+        self.assertEqual(reduce, utils.import_callable("functools.reduce"))
+    
+    
+    def test_import_callable(self):
+        self.assertEqual((tuple(), dict()), utils.import_callable("tests.dummy.DummyCallable")())
+    
+    
+    def test_import_callable_tuple(self):
+        self.assertEqual((tuple(), dict()), utils.import_callable(("tests.dummy.DummyCallable",))())
+    
+    
+    def test_import_callable_args(self):
+        self.assertEqual(
+            (("foo", "bar"), dict()),
+            utils.import_callable(("tests.dummy.DummyCallable", ("foo", "bar")))()
+        )
+    
+    
+    def test_import_callable_kwargs(self):
+        self.assertEqual(
+            (tuple(), {"foo": "bar"}),
+            utils.import_callable(("tests.dummy.DummyCallable", {"foo": "bar"}))()
+        )
+    
+    
+    def test_import_callable_args_kwargs(self):
+        self.assertEqual(
+            (("foo", "bar"), {"foo": "bar"}),
+            utils.import_callable(("tests.dummy.DummyCallable", ("foo", "bar"), {"foo": "bar"}))()
+        )
+    
+    
+    def test_import_class_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(int)
+    
+    
+    def test_import_not_callable_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable("string.ascii_letters")
+    
+    
+    def test_import_first_elem_not_class_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(("functools.reduce", (2,)))
+    
+    
+    def test_import_second_elem_not_iter_or_map_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(("tests.dummy.DummyCallable", 1))
+    
+    
+    def test_import_second_elem_not_iter_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(("tests.dummy.DummyCallable", 1, {}))
+    
+    
+    def test_import_third_elem_not_map_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(("tests.dummy.DummyCallable", [], 1))
+    
+    
+    def test_not_a_callable_str_or_iterable_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable(1)
+    
+    
+    def test_not_a_callable_class_exception(self):
+        with self.assertRaises(ValueError):
+            utils.import_callable("string.Formatter")
 
 
 
@@ -118,86 +212,6 @@ class GetFieldTestCase(TestCase):
     def test_foreign_field_related(self):
         field = utils.get_field_recursive("rivers.countries", Country, self.censor)
         self.assertEqual(utils.get_field("countries", River), field)
-
-
-
-class ImportCallableTestCase(TestCase):
-    
-    def test_import_function(self):
-        self.assertEqual(len, utils.import_callable(len))
-    
-    
-    def test_import_function_path(self):
-        self.assertEqual(reduce, utils.import_callable("functools.reduce"))
-    
-    
-    def test_import_callable(self):
-        self.assertEqual((tuple(), dict()), utils.import_callable("test_utils.DummyCallable")())
-    
-    
-    def test_import_callable_tuple(self):
-        self.assertEqual((tuple(), dict()), utils.import_callable(("test_utils.DummyCallable",))())
-    
-    
-    def test_import_callable_args(self):
-        self.assertEqual(
-            (("foo", "bar"), dict()),
-            utils.import_callable(("test_utils.DummyCallable", ("foo", "bar")))()
-        )
-    
-    
-    def test_import_callable_kwargs(self):
-        self.assertEqual(
-            (tuple(), {"foo": "bar"}),
-            utils.import_callable(("test_utils.DummyCallable", {"foo": "bar"}))()
-        )
-    
-    
-    def test_import_callable_args_kwargs(self):
-        self.assertEqual(
-            (("foo", "bar"), {"foo": "bar"}),
-            utils.import_callable(("test_utils.DummyCallable", ("foo", "bar"), {"foo": "bar"}))()
-        )
-    
-    
-    def test_import_class_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(int)
-    
-    
-    def test_import_not_callable_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable("string.ascii_letters")
-    
-    
-    def test_import_first_elem_not_class_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(("functools.reduce", (2,)))
-    
-    
-    def test_import_second_elem_not_iter_or_map_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(("test_utils.DummyCallable", 1))
-    
-    
-    def test_import_second_elem_not_iter_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(("test_utils.DummyCallable", 1, {}))
-    
-    
-    def test_import_third_elem_not_map_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(("test_utils.DummyCallable", [], 1))
-    
-    
-    def test_not_a_callable_str_or_iterable_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable(1)
-    
-    
-    def test_not_a_callable_class_exception(self):
-        with self.assertRaises(ValueError):
-            utils.import_callable("string.Formatter")
 
 
 

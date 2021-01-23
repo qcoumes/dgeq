@@ -177,7 +177,7 @@ class JoinQuery(JoinMixin):
         
         # Retrieve filters
         filters = list()
-        for f in query_dict.getlist("filters"):
+        for f in utils.split_list_strings(query_dict.getlist("filters"), "'"):
             kwarg = f.split('=', 1)
             if len(kwarg) < 2:
                 raise InvalidCommandError(
@@ -249,8 +249,6 @@ class JoinQuery(JoinMixin):
     def _fetch_unique(self, obj: models.Model) -> Optional[Dict[str, Any]]:
         field = self.field.split("__")[-1]
         related = getattr(obj, field)
-        if related is None:
-            return None
         
         row = {f: getattr(related, f) for f in self.fields}
         

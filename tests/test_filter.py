@@ -1,10 +1,11 @@
 import random
+from unittest import mock
 
 from django.test import TestCase
-from django_dummy_app.models import Country, Disaster, River
 
 from dgeq.exceptions import SearchModifierError
-from dgeq.filter import Filter
+from dgeq.filter import DEFAULT_FILTERS_TABLE, Filter
+from django_dummy_app.models import Country, Disaster, River
 
 
 
@@ -383,3 +384,13 @@ class TypeModifierFilterTestCase(TestCase):
         queryset = f.apply(queryset)
         
         self.assertEqual(list(expected), list(queryset))
+    
+    
+    @mock.patch("dgeq.filter.DGEQ_FILTERS_TABLE", {
+        **DEFAULT_FILTERS_TABLE, **{('!', int): None}
+    })
+    def test_disabled_lookup(self):
+        f = Filter("population", f"!10", True)
+        
+        with self.assertRaises(SearchModifierError):
+            f.get()

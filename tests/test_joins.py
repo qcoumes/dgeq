@@ -299,7 +299,7 @@ class JoinTestCase(TestCase, QueryTestMixin):
         
         j = JoinMixin()
         j.add_join(
-            "region__continent__regions",
+            "region__continent__regions__name",
             JoinQuery.from_query_value("field=region.continent.regions|sort=name", Country, False, self.censor),
             Country, self.censor
         )

@@ -11,16 +11,10 @@ from django.db.models import Field
 from django.http import QueryDict
 from django.utils.module_loading import import_string
 
+from . import constants
 from .censor import Censor
-from .exceptions import (FieldDepthError, MAX_FOREIGN_FIELD_DEPTH, NotARelatedFieldError,
-                         UnknownFieldError)
+from .exceptions import FieldDepthError, NotARelatedFieldError, UnknownFieldError
 
-
-# Separators use in subquery for some commands (like `c:annotate` or `c:join`)
-# `SUBQUERY_SEP_FIELDS` is used to separate field/value(s) pairs
-# `SUBQUERY_SEP_VALUES` is used to separate values in a same field
-SUBQUERY_SEP_FIELDS = getattr(settings, 'DGEQ_SUBQUERY_SEP_FIELDS', '|')
-SUBQUERY_SEP_VALUES = getattr(settings, 'DGEQ_SUBQUERY_SEP_VALUES', "'")
 
 # Type corresponding to the Union of each field used for relations
 ForeignField = Union[
@@ -32,20 +26,134 @@ ForeignField = Union[
 # Type mapping a Model to a subset of its field
 FieldMapping = Dict[Type[models.Model], Iterable[str]]
 
+# Fields containing a list of Foreign Keys.
+MANY_FOREIGN_FIELD = (models.ManyToOneRel, models.ManyToManyField, models.ManyToManyRel)
+# Fields containing only one Foreign Key
+UNIQUE_FOREIGN_FIELD = (models.OneToOneRel, models.OneToOneField, models.ForeignKey)
+
+Nothing = type(Ellipsis)
+
+# Typing of a command
+CommandType = Callable[['GenericQuery', str, List[str]], None]
+
+# Typing of a type parser
+TypeParser = Callable[[str], Union[Nothing, float]]
+
 # Type corresponding to a Callable or a dotted path to a Callable with its
 # optional arguments
 ImportableCallable = Union[
-    Callable,  # Function or instance of a class declaring __call__
+    CommandType,
+    TypeParser,
+    Callable,
     str,  # Dotted path to a function, or class with no argument
     Tuple[str],  # Dotted path to a class with no argument in a tuple
     Tuple[str, Iterable[Any]],  # Dotted path to a class with args
     Tuple[str, Dict[str, Any]],  # Dotted path to a class with kwargs
     Tuple[str, Iterable[Any], Dict[str, Any]],  # Dotted path to a class with args and kwargs
 ]
-# Fields containing a list of Foreign Keys.
-MANY_FOREIGN_FIELD = (models.ManyToOneRel, models.ManyToManyField, models.ManyToManyRel)
-# Fields containing only one Foreign Key
-UNIQUE_FOREIGN_FIELD = (models.OneToOneRel, models.OneToOneField, models.ForeignKey)
+
+
+
+
+def import_class(o: Union[type, str]) -> type:
+    """Take a dotted path to a class, and return the corresponding class.
+    
+    If `o` is already a class, it is returned as is."""
+    if callable(o):
+        if not isinstance(o, type):
+            raise ValueError(f"Given object is not a class ('{o}')")
+        return o
+    
+    imported = import_string(o)
+    if not callable(imported) or not isinstance(imported, type):
+        raise ValueError(f"Given path does not point to a class ('{o}')")
+    
+    return imported
+
+
+
+def import_callable(o: ImportableCallable) -> Callable:
+    """Take a dotted path to a `Callable`, and return the corresponding
+    object.
+    
+    If `o` is already a function or an instance of a class declaring
+    `__class__`, it is returned as is.
+    
+    If `o` is a `str`, it must be a dotted path to a function or a class
+    declaring `__call__()` and a constructor with no argument. The function or
+    an instance of the class will be returned.
+    
+    If `o` is an `Iterable`, its first element must be a dotted path to a
+    class declaring `__call__()`:
+    
+    * If its length is 2, its second element must be either an `Iterable` or a
+    `Mapping` containing respectively the arguments or the keyworded arguments
+    that will be given to the class's constructors.
+    
+    * If its length is greater than 2, the second element must be an `Iterable`
+    and the third element a `Mapping` containing respectively the arguments and
+    the keyworded arguments that will be given to the class's constructors."""
+    if callable(o):
+        if isinstance(o, type):
+            raise ValueError(f"Given callable cannot be a class ('{o}')")
+        return o
+    
+    if isinstance(o, str):
+        imported = import_string(o)
+        if not callable(imported):
+            raise ValueError(f"Given path does not point to a callable ('{o}')")
+        
+        if not isinstance(imported, type):  # Is not a class
+            return imported
+        
+        args = tuple()
+        kwargs = dict()
+    
+    elif isinstance(o, abc.Iterable):
+        o = list(o)
+        args = tuple()
+        kwargs = dict()
+        imported = import_string(o[0])
+        if not isinstance(imported, type):
+            raise ValueError(
+                f"First element of given iterable does not point to a class ('{o[0]}')"
+            )
+        
+        if len(o) == 2:
+            if isinstance(o[1], abc.Mapping):
+                args = tuple()
+                kwargs = o[1]
+            elif isinstance(o[1], abc.Iterable):
+                args = o[1]
+                kwargs = dict()
+            else:
+                raise ValueError(
+                    "Second element of given iterable must be either an iterable or a mapping if "
+                    "its length is 2"
+                )
+        
+        elif len(o) == 3:
+            if not isinstance(o[1], abc.Iterable):
+                raise ValueError(
+                    "Second element of given iterable must be an iterable if its length is greater "
+                    "than 2"
+                )
+            if not isinstance(o[2], abc.Mapping):
+                raise ValueError(
+                    "Second element of given iterable must be a mapping if its length is greater "
+                    "than 2"
+                )
+            args = o[1]
+            kwargs = o[2]
+    
+    else:
+        raise ValueError("Given element is neither a Callable, a str nor an iterable")
+    
+    imported = imported(*args, **kwargs)
+    if not callable(imported):
+        raise ValueError("Given class does not declare __call__")
+    
+    return imported
 
 
 
@@ -120,14 +228,14 @@ def check_field(field: str, model: Type[models.Model], censor: Censor,
         * `UnknownFieldError` if any of the field or foreign fields does not
            exists.
         * `FieldDepthError` if the depth of foreign field exceed
-           `MAX_FOREIGN_FIELD_DEPTH`.
+           `DGEQ_MAX_NESTED_FIELD_DEPTH`.
         * `NotAForeignFieldError` if a field used as a relation isn't a foreign
            field.
     """
+    from .constants import DGEQ_MAX_NESTED_FIELD_DEPTH
+    
     field_list = field.split(sep)
-    max_depth = getattr(
-        settings, "MAX_FOREIGN_FIELD_DEPTH", MAX_FOREIGN_FIELD_DEPTH
-    )
+    max_depth = getattr(settings, "DGEQ_MAX_NESTED_FIELD_DEPTH", DGEQ_MAX_NESTED_FIELD_DEPTH)
     if len(field_list) >= max_depth:
         raise FieldDepthError(field)
     
@@ -152,112 +260,8 @@ def get_field_recursive(field: str, model: Type[models.Model], censor: Censor,
 
 
 
-def import_callable(o: ImportableCallable) -> Callable:
-    """Take a dotted path to a `Callable`, and return the corresponding
-    object.
-    
-    If `o` is already a function or an instance of a class declaring
-    `__class__`, it is return as is.
-    
-    If `o` is a `str`, it must be a dotted path to a funtion or a class
-    declaring `__call__()` and a constructor with no argument. The function or
-    an instance of the class will be returned.
-    
-    If `o` is an `Iterable`, its first element must be a dotted path to a
-    class declaring `__call__()`:
-    
-    * If its length is 2, its second element must be either an `Iterable` or a
-    `Mapping` containing respectively the arguments or the keyworded arguments
-    that will be given to the class's constructors.
-    
-    * If its length is greater than 2, the second element must be an `Iterable`
-    and the third element a `Mapping` containing respectively the arguments and
-    the keyworded arguments that will be given to the class's constructors.
-    
-    >>> import_callable(len)
-    <built-in function len>
-    >>> import_callable("functools.reduce")
-    <built-in function reduce>
-    >>> class Dummy:
-    ...     def __init__(self, *args, **kwargs):  # noqa
-    ...             self.args, self.kwargs = args, kwargs
-    ...     def __call__(self):
-    ...             print(self.args, self.kwargs)
-    >>> import_callable("__main__.Dummy")()
-    () {}
-    >>> import_callable(("__main__.Dummy",))()
-    () {}
-    >>> import_callable(("__main__.Dummy", ("foo", "bar")))()
-    ('foo', 'bar') {}
-    >>> import_callable(("__main__.Dummy", {"foo": "bar"}))()
-    () {'foo': 'bar'}
-    >>> import_callable(("__main__.Dummy", ("foo", "bar"), {"foo": "bar"}))()
-    ('foo', 'bar') {'foo': 'bar'}
-    """
-    if callable(o):
-        if isinstance(o, type):
-            raise ValueError("Given callable cannot be a class")
-        return o
-    
-    if isinstance(o, str):
-        imported = import_string(o)
-        if not callable(imported):
-            raise ValueError("Given path does not point to a callable")
-        
-        if not isinstance(imported, type):  # Is not a class
-            return imported
-        
-        args = tuple()
-        kwargs = dict()
-    
-    elif isinstance(o, abc.Iterable):
-        o = list(o)
-        args = tuple()
-        kwargs = dict()
-        imported = import_string(o[0])
-        if not isinstance(imported, type):
-            raise ValueError("First element of given iterable does not point to a class")
-        
-        if len(o) == 2:
-            if isinstance(o[1], abc.Mapping):
-                args = tuple()
-                kwargs = o[1]
-            elif isinstance(o[1], abc.Iterable):
-                args = o[1]
-                kwargs = dict()
-            else:
-                raise ValueError(
-                    "Second element of given iterable must be either an iterable or a mapping if "
-                    "its length is 2"
-                )
-        
-        elif len(o) == 3:
-            if not isinstance(o[1], abc.Iterable):
-                raise ValueError(
-                    "Second element of given iterable must be an iterable if its length is greater "
-                    "than 2"
-                )
-            if not isinstance(o[2], abc.Mapping):
-                raise ValueError(
-                    "Second element of given iterable must be a mapping if its length is greater "
-                    "than 2"
-                )
-            args = o[1]
-            kwargs = o[2]
-    
-    else:
-        raise ValueError("Given element is neither a Callable, a str nor an iterable")
-    
-    imported = imported(*args, **kwargs)
-    if not callable(imported):
-        raise ValueError("Given class does not declare __call__")
-    
-    return imported
-
-
-
-def subquery_to_querydict(qs: str, fields_sep: str = SUBQUERY_SEP_FIELDS,
-                          values_sep: str = SUBQUERY_SEP_VALUES) -> QueryDict:
+def subquery_to_querydict(qs: str, fields_sep: str = None,
+                          values_sep: str = None) -> QueryDict:
     """Create a `QueryDict` out of a subquery string.
     
     Subquery strings are value of commands using different key/value pairs,
@@ -274,6 +278,11 @@ def subquery_to_querydict(qs: str, fields_sep: str = SUBQUERY_SEP_FIELDS,
     ValueError: A key/value pair must contains an equal '=', received
     'field_value_without_equal'
     """
+    if fields_sep is None:
+        fields_sep = constants.DGEQ_SUBQUERY_SEP_FIELDS
+    if values_sep is None:
+        values_sep = constants.DGEQ_SUBQUERY_SEP_VALUES
+    
     query_dict = QueryDict(mutable=True)
     
     for kwarg in qs.split(fields_sep):
@@ -351,15 +360,6 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
             set_fields.add(field_name)
     
     return set_fields, one_fields, many_fields
-
-
-
-class DistinctCount(models.Count):
-    """Wrap `models.Count(distinct=True)`."""
-    
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, distinct=True, **kwargs)
 
 
 

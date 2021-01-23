@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.test import TestCase
 
 from dgeq import utils
-from dgeq.aggregations import Aggregation, Annotation
+from dgeq.aggregations import Aggregation, Annotation, DistinctCount
 from dgeq.exceptions import InvalidCommandError
 from dgeq.filter import Filter
 from dgeq.utils import Censor
@@ -142,7 +142,7 @@ class AnnotationTestCase(TestCase):
             Annotation("rivers__length", "rivers_length_avg", models.Avg),
             Annotation("rivers__length", "rivers_length_sum", models.Sum),
             Annotation("rivers__length", "rivers_length_cnt", models.Count),
-            Annotation("rivers__length", "rivers_length_dcnt", utils.DistinctCount),
+            Annotation("rivers__length", "rivers_length_dcnt", DistinctCount),
             # These function aren't supported by sqlite at the moment
             # Annotation("rivers__length", "rivers_length_stddev", models.StdDev),
             # Annotation("rivers__length", "rivers_length_var", models.Variance),
