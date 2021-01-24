@@ -40,7 +40,7 @@ long_description = (codecs.open(os.path.join(dirname, 'README.md'), encoding='ut
 
 setup(
     name='dgeq',
-    version="0.3.7",
+    version="0.4.0",
     description=short_description,
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -48,6 +48,6 @@ setup(
     author_email='coumes.quentin@gmail.com',
     url='https://github.com/qcoumes/dgeq',
     packages=['dgeq'],
-    install_requires=['django>=1.8', 'python-dateutil'],
+    install_requires=['django>=2.0.0', 'python-dateutil'],
     classifiers=CLASSIFIERS,
 )
