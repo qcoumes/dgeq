@@ -9,6 +9,8 @@ The `status` is set to `False` and the result necessarily contains these fields 
 
 Different fields can be added according to each specific error.
 
+___
+
 ## INVALID_SEARCH_MODIFIER
 
 Occurs when using a wrong combination of search modifier and value.
@@ -36,6 +38,8 @@ Example:
   "type": "float"
 }
 ```
+
+___
 
 ## UNKNOWN_FIELD
 
@@ -69,11 +73,11 @@ Example :
 }
 ```
 
+___
+
 ## NOT_A_RELATED_FIELD
 
-Occurs when trying to use a field that is not a related field for
-operation spanning relationships.
-
+Occurs when trying to use a field that is not a related field for operation spanning relationships.
 
 Contains the following field:
 
@@ -95,16 +99,18 @@ Example :
   "code": "NOT_A_RELATED_FIELD",
   "table": "Continent",
   "field": "name",
-  "related_fields": ["regions"]
+  "related_fields": [
+    "regions"
+  ]
 }
 ```
 
-## FIELD_DEPTH_ERROR
+___
 
+## FIELD_DEPTH_ERROR
 
 Occurs if a lookup spanning relationships exceed
 `DGEQ_MAX_NESTED_FIELD_DEPTH` number of relation.
-
 
 Contains the following field:
 
@@ -126,6 +132,8 @@ Example :
   "max_depth": 4
 }
 ```
+
+___
 
 ## INVALID_COMMAND_ERROR
 
@@ -149,6 +157,8 @@ Example :
   "command": "c:sort"
 }
 ```
+
+___
 
 ## UNKNOWN
 

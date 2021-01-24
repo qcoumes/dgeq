@@ -1,4 +1,4 @@
-# Query Syntaxe
+# Query Syntax
 
 
 Throughout this guide, we’ll refer to the following models, which refer to the world geography :
@@ -58,7 +58,7 @@ by the ordered defined in the model's class.
 Filters are created by using the standard `field=value` of query strings. The `field` portion must
 correspond to a particular field of the queried model.
 
-You can also query on related model using a dot `.` notation. For example, considering the
+You can also query on a related model using a dot `.` notation. For example, considering the
 following data :
 
 ```json
@@ -294,7 +294,7 @@ Note that you can do nested join using dot `.`. For instance to get the `Region`
 * `disaster/?id=1&c:join=field=country.region`
 
 In this case, the field `country` will also be joined, but only its field `region` will be in the
-rows. If you want to get other field, you must also join this field on its own :
+rows. If you want to get an other field, you must also join this field on its own :
 
 * `disaster/?id=1&c:join=field=country,field=country.region`
 

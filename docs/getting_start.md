@@ -2,7 +2,7 @@
 
 ## Installation
 
-You can install `DGeQ` either throup `PyPI` :
+You can install `DGeQ` either through `PyPI` :
 
 ```shell
 pip3 install dgeq
@@ -46,7 +46,7 @@ the key `status`.
 * If `status` is `True`, the query succeeded, and the result can contain other fields :
 
     * `rows` if [`c:evaluate`](query_syntax.md#commands) was not set to `0`.
-      `rows` is a list (may be empty) containing the queried models.
+      `rows` is a list (maybe empty) containing the queried models.
     * `time` if [`c:time`](query_syntax.md#commands) was set to `1`.
     * `count` if [`c:count`](query_syntax.md#commands) was set to `1`.
     * Any field declared in the `to` argument of [`c:aggregate`](query_syntax.md#caggregate)

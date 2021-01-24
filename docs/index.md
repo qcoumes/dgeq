@@ -13,7 +13,7 @@ DGeQ (**D**jango **Ge**neric **Q**uery) is a package that allows the constructio
 query on any `Model`. It implements a [*query string* syntax](query_syntax.md) allowing filtering,
 join, annotation, aggregation and more.
 
-Even though this package is primarily intended for the creation of public API, allowing to set
+Even though this package is primarily intended for the creation of public API, allowing setting
 new endpoints with only few lines of code, it could also be used to communicate with other services
 or a front-end framework.
 
@@ -21,7 +21,7 @@ or a front-end framework.
 
 * You can choose which field of which `Model` can be queried.
 
-* Natively support the follow types : `int`, `float`, `string`, `boolean`, `date` and `None`
+* Natively support the following types : `int`, `float`, `string`, `boolean`, `date` and `None`
 
 * Natively support most of Django's lookup function : `(i)exact`, `(i)contains`, `(i)startswith`
   , `(i)endswith`, `gt(e)` and `lt(e)`.

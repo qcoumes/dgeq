@@ -3,10 +3,12 @@
 The following settings can be overridden or modified in your `settings.py` to customize
 how `dgeq` works.
 
+___
+
 ## `DGEQ_AGGREGATION_FUNCTION`
 
-List functions available for [`c:aggregate`](../dgeq/template/query_syntax.md#caggregate)
-and [`c:annotate`](../dgeq/template/query_syntax.md#cannotate). Must be a dictionary where the key
+List functions available for [`c:aggregate`](query_syntax.md#caggregate)
+and [`c:annotate`](query_syntax.md#cannotate). Must be a dictionary where the key
 is the name used in a query string, and the value a function returning an aggregate.
 
 For the key, you can directly use the imported aggregate, or the corresponding dotted path.
@@ -26,12 +28,14 @@ DGEQ_AGGREGATION_FUNCTION = {
 }
 ```
 
+___
+
 ## `DGEQ_COMMANDS`
 
 Allow the redefinition of the list of commands use by `DGeQ`. For more information about commands,
 see [Commands](/commands.md).
 
-You can directly use the imported command or the corresponding dotted path.
+You can directly use the imported command, or the corresponding dotted path.
 
 Default value is :
 
@@ -52,12 +56,16 @@ DGEQ_COMMANDS = [
 ]
 ```
 
+___
+
 ## `DGEQ_DEFAULT_LIMIT`
 
-Default limit on row count when [`c:limit`](../dgeq/template/query_syntax.md#commands) is not provided. Set to 0 to
+Default limit on row count when [`c:limit`](query_syntax.md#commands) is not provided. Set to 0 to
 return every row. Should not be higher than [`DGEQ_MAX_LIMIT`](#dgeq_default_limit).
 
 Default value is `10`.
+
+___
 
 ## `DGEQ_EXCLUDE_SEARCH_MODIFIER`
 
@@ -69,6 +77,8 @@ Default value is :
 ```python
 DGEQ_EXCLUDE_SEARCH_MODIFIER = ['!', '~']
 ```
+
+___
 
 ## `DGEQ_FILTERS_TABLE`
 
@@ -141,16 +151,22 @@ DGEQ_FILTERS_TABLE = {
 For some operation, you may want to take a look
 at [`DGEQ_EXCLUDE_SEARCH_MODIFIER`](#dgeq_exclude_search_modifier) above.
 
+___
+
 ## `DGEQ_MAX_LIMIT`
 
 Maximum number of row returned in a response (set to '0' to allow any limit). The request will fail
-if an higher number is given to [`c:limit`](../dgeq/template/query_syntax.md#commands)
+if a higher number is given to [`c:limit`](query_syntax.md#commands)
 
 Default value is `200`.
+
+___
 
 ## `DGEQ_MAX_NESTED_FIELD_DEPTH`
 
 Max depth of nested field, default value is `10`.
+
+___
 
 ## `DGEQ_PRIVATE_FIELDS`
 
@@ -171,6 +187,8 @@ DGEQ_PRIVATE_FIELDS = {}
 
 See [`Censor`](censor.md) for more information.
 
+___
+
 ## `DGEQ_PUBLIC_FIELDS`
 
 Dictionary mapping django's model to a list of fields that will be marked as public. Every other
@@ -186,27 +204,35 @@ For the key, you can directly use the imported model, or the corresponding dotte
 Default value is :
 
 ```python
-DGEQ_PRIVATE_FIELDS = {}
+DGEQ_PUBLIC_FIELDS = {
+    "django.contrib.auth.models.User": ["id", "username"]
+}
 ```
 
 See [`Censor`](censor.md) for more information.
 
+___
+
 ## `DGEQ_SUBQUERY_SEP_FIELDS`
 
-Character used in subquery for some commands (like [`c:annotate`](../dgeq/template/query_syntax.md#cannotate)
-or [`c:join`](../dgeq/template/query_syntax.md#cjoin)) to delimit field/value pairs. For instance
+Character used in subquery for some commands (like [`c:annotate`](query_syntax.md#cannotate)
+or [`c:join`](query_syntax.md#cjoin)) to delimit a field/value pairs. For instance
 in `continent/?c:join=field=regions|hide=countries`, this is the pipe `|`
 character.
 
 Default to pipe `|`
 
+___
+
 ## `DGEQ_SUBQUERY_SEP_VALUES`
 
-Character used in subquery for some commands (like [`c:annotate`](../dgeq/template/query_syntax.md#cannotate)
-or [`c:join`](../dgeq/template/query_syntax.md#cjoin)) to delimit different values of a same fields. For instance
+Character used in subquery for some commands (like [`c:annotate`](query_syntax.md#cannotate)
+or [`c:join`](query_syntax.md#cjoin)) to delimit different values of a same fields. For instance
 in `region/?c:join=field=countries|show=name'population`, this is the apostrophe `'` character.
 
 Default to apostrophe `'`
+
+___
 
 ## `DGEQ_TYPE_PARSERS`
 
@@ -216,7 +242,11 @@ Parsers must ba a callable or a dotted path (E.G. `dgeq.parsers.none_parser`)
 to a callable which return either the parsed type, or `Ellipsis` if no type were matched. If every
 parser returned `Ellipsis`, the value will be interpreted as a string.
 
-You can directly use the imported parser or the corresponding dotted path.
+Note that the order does matter : the first value different from `Ellipsis`
+will be used. So for instance, if you set `float_parser` before `int_parser`, all `int`
+will be parsed as `float` (since any `int` is a valid `float`).
+
+You can directly use the imported parser, or the corresponding dotted path.
 
 Default value is :
 

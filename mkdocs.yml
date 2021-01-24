@@ -14,17 +14,20 @@ nav:
     - Censor: censor.md
 
   - "API End-User":
-      - Syntax: query_syntax.md
+      - "Query Syntax": query_syntax.md
       - Errors: errors.md
       - "Test it online!": https://dgeq.qcoumes.com/
 
   - "Advanced Usage":
-      - Commands: commands.md
       - Types: types.md
+      - Exceptions: exceptions.md
+      - Commands: commands.md
+      - "Helper Functions": help_functions.md
 
-  - Changelog: CHANGELOG.md
-  - License: LICENSE.md
-  - Github: https://github.com/qcoumes/dgeq/
+  - "Other":
+    - Changelog: CHANGELOG.md
+    - License: LICENSE.md
+    - Github: https://github.com/qcoumes/dgeq/
 
 
 
