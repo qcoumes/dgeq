@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 import os
 import sys
 
-
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append((os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -75,7 +74,6 @@ WSGI_APPLICATION = 'tests.project.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -85,7 +83,6 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -100,6 +97,52 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# Logger information
+LOGGING = {
+    'version':                  1,
+    'disable_existing_loggers': False,
+    'filters':                  {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true':  {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'formatters':               {
+        'verbose': {
+            'format':  '[%(asctime)-15s] %(levelname)s -- '
+                       'File: %(pathname)s line n°%(lineno)d -- %(message)s',
+            'datefmt': '%Y/%m/%d %H:%M:%S'
+        },
+        'simple':  {
+            'format':  '[%(asctime)-15s] %(levelname)s -- %(message)s',
+            'datefmt': '%Y/%m/%d %H:%M:%S'
+        },
+    },
+    'handlers':                 {
+        'console':     {
+            'level':     'DEBUG',
+            'filters':   ['require_debug_true'],
+            'class':     'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+        'mail_admins': {
+            'level':        'ERROR',
+            'class':        'django.utils.log.AdminEmailHandler',
+            'include_html': True,
+            'formatter':    'verbose'
+        }
+    },
+    'loggers':                  {
+        '': {
+            'handlers': ['console'],
+            'level':    'DEBUG',
+        },
+    },
+}
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
@@ -118,3 +161,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+
+DGEQ_MAX_NESTED_FIELD_DEPTH = 4

@@ -16,25 +16,25 @@ class JoinMixin:
     
     joins: Dict[str, 'JoinMixin']
     fields: Set[str]
-    one_fields: Set[str]
-    many_fields: Set[str]
+    _one_fields: Set[str]
+    _many_fields: Set[str]
     model: Type[models.Model]
     
     
     def __init__(self):
         self.joins = dict()
         self.fields = set()
-        self.one_fields = set()
-        self.many_fields = set()
+        self._one_fields = set()
+        self._many_fields = set()
     
     
     def add_field(self, field_name):
         """Add this field to an existing join."""
         field = utils.get_field(field_name, self.model)
         if utils.is_one(field):
-            self.one_fields.add(field_name)
+            self._one_fields.add(field_name)
         else:
-            self.many_fields.add(field_name)
+            self._many_fields.add(field_name)
     
     
     def add_join(self, field: str, join: 'JoinMixin', model: Type[models.Model], censor: Censor,
@@ -108,16 +108,16 @@ class JoinQuery(JoinMixin):
         
         self.fields = fields
         # Separating unique and many related fields
-        self.one_fields = set()
-        self.many_fields = set()
+        self._one_fields = set()
+        self._many_fields = set()
         for field_name in list(self.fields):
             field = utils.get_field(field_name, self.model)
             if utils.is_one(field):
                 self.fields.discard(field_name)
-                self.one_fields.add(field_name)
+                self._one_fields.add(field_name)
             elif utils.is_many(field):
                 self.fields.discard(field_name)
-                self.many_fields.add(field_name)
+                self._many_fields.add(field_name)
     
     
     @classmethod
@@ -143,9 +143,9 @@ class JoinQuery(JoinMixin):
         field_name = query_dict["field"].replace(".", "__")
         
         # Retrieve show & hide:
-        show = [f for f in utils.split_list_strings(query_dict.getlist("show"), "'")]
+        show = [f for f in utils.split_list_values(query_dict.getlist("show"), "'")]
         [utils.check_field(f, target_model, censor, arbitrary_fields) for f in show]
-        hide = [f for f in utils.split_list_strings(query_dict.getlist("hide"), "'")]
+        hide = [f for f in utils.split_list_values(query_dict.getlist("hide"), "'")]
         [utils.check_field(f, target_model, censor, arbitrary_fields) for f in hide]
         
         # Retrieve start & limit:
@@ -162,7 +162,7 @@ class JoinQuery(JoinMixin):
         start, limit = int(start), int(limit)
         
         # Retrieve sort
-        sort = utils.split_list_strings(query_dict.getlist("sort"), "'")
+        sort = utils.split_list_values(query_dict.getlist("sort"), "'")
         for f in sort:
             utils.check_field(
                 (f if not f.startswith("-") else f[1:]), target_model, censor, arbitrary_fields
@@ -179,7 +179,7 @@ class JoinQuery(JoinMixin):
         
         # Retrieve filters
         filters = list()
-        for f in utils.split_list_strings(query_dict.getlist("filters"), "'"):
+        for f in utils.split_list_values(query_dict.getlist("filters"), "'"):
             kwarg = f.split('=', 1)
             if len(kwarg) < 2:
                 raise InvalidCommandError(
@@ -204,10 +204,10 @@ class JoinQuery(JoinMixin):
             subquery = subquery.order_by(*self.sort)
         
         subquery = subquery.select_related(
-            *[f for f in self.one_fields if f not in self.joins.keys()]
+            *[f for f in self._one_fields if f not in self.joins.keys()]
         )
         subquery = subquery.prefetch_related(
-            *[f for f in self.many_fields if f not in self.joins.keys()]
+            *[f for f in self._many_fields if f not in self.joins.keys()]
         )
         
         new = queryset.prefetch_related(models.Prefetch(self.field, queryset=subquery))
@@ -242,7 +242,7 @@ class JoinQuery(JoinMixin):
         
         for item in subquery:
             row = utils.serialize_row(
-                item, self.fields, self.one_fields, self.many_fields, self.joins
+                item, self.fields, self._one_fields, self._many_fields, self.joins
             )
             rows.append(row)
         return rows
@@ -254,14 +254,14 @@ class JoinQuery(JoinMixin):
         
         row = {f: getattr(related, f) for f in self.fields}
         
-        for f in self.one_fields:
+        for f in self._one_fields:
             if f in self.joins.keys():
                 row[f] = self.joins[f].fetch(related)
             else:
                 row[f] = getattr(related, f)
                 row[f] = None if row[f] is None else row[f].pk
         
-        for f in self.many_fields:
+        for f in self._many_fields:
             if f in self.joins.keys():
                 row[f] = self.joins[f].fetch(related)
             else:

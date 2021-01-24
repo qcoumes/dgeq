@@ -58,7 +58,7 @@ class AggregationTestCase(TestCase):
             "field=population|func=max|to=population_max,"
             "field=population|func=min|to=population_min"
         )
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         aggregations = [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
         aggregations = [a.get() for a in aggregations]
         kwargs = dict(aggregations)
@@ -73,7 +73,7 @@ class AggregationTestCase(TestCase):
     
     def test_no_equal_subquery_string(self):
         query_string = "population"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -81,7 +81,7 @@ class AggregationTestCase(TestCase):
     
     def test_missing_func(self):
         query_string = "field=population|to=population_max"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -89,7 +89,7 @@ class AggregationTestCase(TestCase):
     
     def test_unknown_func(self):
         query_string = "field=population|to=population_max|func=unknown"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -97,7 +97,7 @@ class AggregationTestCase(TestCase):
     
     def test_missing_field(self):
         query_string = "to=population_max|func=max"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -105,7 +105,7 @@ class AggregationTestCase(TestCase):
     
     def test_missing_to(self):
         query_string = "field=population|func=max"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -113,7 +113,7 @@ class AggregationTestCase(TestCase):
     
     def test_already_use_to(self):
         query_string = "field=population|func=max|to=name"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -121,7 +121,7 @@ class AggregationTestCase(TestCase):
     
     def test_invalid_to(self):
         query_string = "field=population|func=max|to=1notvalid"
-        aggregations = utils.split_list_strings([query_string], ",")
+        aggregations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Aggregation.from_query_value(a, Country, self.censor) for a in aggregations]
@@ -268,7 +268,7 @@ class AnnotationTestCase(TestCase):
             "field=population|func=max|to=population_max|filters=rivers.length=<1500|early=0,"
             "field=population|func=min|to=population_min|filters=rivers.length=<1500|early=0"
         )
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         annotations = [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
         query = Country.objects.all()
         for a in annotations:
@@ -290,7 +290,7 @@ class AnnotationTestCase(TestCase):
     
     def test_no_equal_subquery_string(self):
         query_string = "population"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -298,7 +298,7 @@ class AnnotationTestCase(TestCase):
     
     def test_missing_func(self):
         query_string = "field=population|to=population_max|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -306,7 +306,7 @@ class AnnotationTestCase(TestCase):
     
     def test_unknown_func(self):
         query_string = "field=population|to=population_max|func=unknown|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -314,7 +314,7 @@ class AnnotationTestCase(TestCase):
     
     def test_missing_field(self):
         query_string = "to=population_max|func=max|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -322,7 +322,7 @@ class AnnotationTestCase(TestCase):
     
     def test_missing_to(self):
         query_string = "field=population|func=max|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -330,7 +330,7 @@ class AnnotationTestCase(TestCase):
     
     def test_already_use_to(self):
         query_string = "field=population|func=max|to=name|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -338,7 +338,7 @@ class AnnotationTestCase(TestCase):
     
     def test_invalid_to(self):
         query_string = "field=population|func=max|to=1notvalid|filters=rivers.length=<1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -346,7 +346,7 @@ class AnnotationTestCase(TestCase):
     
     def test_invalid_filter(self):
         query_string = "field=population|func=max|to=population_max|filters=1500|early=0"
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]
@@ -356,7 +356,7 @@ class AnnotationTestCase(TestCase):
         query_string = (
             "field=population|func=max|to=population_max|filters=rivers.length=<1500|early=invalid"
         )
-        annotations = utils.split_list_strings([query_string], ",")
+        annotations = utils.split_list_values([query_string], ",")
         
         with self.assertRaises(InvalidCommandError):
             [Annotation.from_query_value(a, Country, False, self.censor) for a in annotations]

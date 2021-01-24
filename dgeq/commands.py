@@ -70,7 +70,7 @@ class Annotate(Command):
     
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
-        annotations = utils.split_list_strings(values)
+        annotations = utils.split_list_values(values)
         
         query.annotations = list()
         
@@ -103,7 +103,7 @@ class Aggregate(Command):
     
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
-        aggregations = utils.split_list_strings(values)
+        aggregations = utils.split_list_values(values)
         aggregations = [
             Aggregation.from_query_value(
                 a, query.model, query.censor, query.arbitrary_fields
@@ -263,7 +263,7 @@ class Filtering(Command):
                 field, "You cannot filter on fields after 'c:start' or 'c:limit'"
             )
         
-        values = utils.split_list_strings(values)
+        values = utils.split_list_values(values)
         filters = Q()
         for v in values:
             utils.check_field(field, query.model, query.censor, query.arbitrary_fields)
@@ -305,7 +305,7 @@ class Join(Command):
     
     
     def __call__(self, query: 'GenericQuery', field: str, values: List[str]):
-        joins = utils.split_list_strings(values)
+        joins = utils.split_list_values(values)
         
         # Create joins in the query
         query_joins = dict()
@@ -347,7 +347,7 @@ class Show(Command):
             for f in query.model._meta.get_fields()
         }
         
-        fields = utils.split_list_strings(values)
+        fields = utils.split_list_values(values)
         for f in fields:
             utils.check_field(f, query.model, query.censor, query.arbitrary_fields)
 
@@ -377,7 +377,7 @@ class Sort(Command):
                 "c:sort", "cannot be used after 'c:start' or 'c:limit'"
             )
         
-        fields = utils.split_list_strings(values)
+        fields = utils.split_list_values(values)
         
         for f in fields:
             utils.check_field(
@@ -426,8 +426,8 @@ class Subset(Command):
                 )
             if limit:
                 query.queryset = query.queryset[:limit]
-            query.sliced = True
-            query.limit_set = True
+                query.sliced = True
+                query.limit_set = True
 
 
 

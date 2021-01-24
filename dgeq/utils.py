@@ -162,7 +162,13 @@ def get_field(field: str, model: Type[models.Model]) -> models.Field:
     
     Also work on reverse fields. The default name used by reverse fields
     (`[model]_set`) does not correspond to the actual name of the field when
-    using `[model]._meta.get_field()`."""
+    using `[model]._meta.get_field()`.
+    
+    Parameters :
+        * `field` (`str`) - Name of the field.
+        * `model` (`Type[models.Model]`) - Model to retrieve the field from.
+    
+    """
     return model._meta.get_field(field if not field.endswith("_set") else field[:-4])
 
 
@@ -209,28 +215,38 @@ def _check_field(fields: List[str], current_model: Type[models.Model], censor: C
 
 def check_field(field: str, model: Type[models.Model], censor: Censor,
                 arbitrary_fields: Iterable[str] = (), sep=".") -> Tuple[Type[models.Model], str]:
-    """Recursively check that a field exists foreign field.
+    """Recursively check that a field exists.
     
     `arbitrary_fields` can be a list of string indicating arbitrary field added
     by some `QuerySet` method (like `annotate()` or `prefetch_related()`.
     
-    Foreign field are separated by `sep`. For instance, if a model `Book`
-    has a foreign key 'library' to a model `Library` which in turn has a foreign
-    key `owner` to a model `Person`, one could do `library.owner.name` using
-    dot `.` as `sep`.
+    Related fields are separated by `sep`. For instance, if a model `Region`
+    has a foreign key 'continent' to a model `Continent`, one could do
+    `continent.name` using  dot `.` as `sep`.
     
-    Additionally return a tuple (model : `models.Model`, field : `str`)
+    Additionally, return a tuple (model : `models.Model`, field : `str`)
     corresponding to the last model and last field. For instance, using the
-    same models as above, calling `check_field(Book, "library.owner.name")`
-    would return `(Person, "name")`.
+    same models as above, calling `check_field(Region, "continent.name")`
+    would return `(Continent, "name")`.
     
-    Raise
+    Parameters :
+        * `field` (`str`) - Name of the field.
+        * `model` (`Type[models.Model]`) - Model to retrieve the field from.
+        * `censor` (`Censor`) - Current censor use by the
+          [`GenericQuery`](generic_query.md).
+        * `arbitrary_fields` (`Iterable[str]`) - Optional list of arbitrary
+          fields not present by default in the model, e.g. fields added by
+          annotations.
+        * `sep` (`str`) - Separator used for spanning relationship
+          lookup (default to `.`).
+    
+    Raises :
         * `UnknownFieldError` if any of the field or foreign fields does not
-           exists.
+        exists.
         * `FieldDepthError` if the depth of foreign field exceed
-           `DGEQ_MAX_NESTED_FIELD_DEPTH`.
+        `DGEQ_MAX_NESTED_FIELD_DEPTH`.
         * `NotAForeignFieldError` if a field used as a relation isn't a foreign
-           field.
+        field.
     """
     from .constants import DGEQ_MAX_NESTED_FIELD_DEPTH
     
@@ -263,20 +279,19 @@ def get_field_recursive(field: str, model: Type[models.Model], censor: Censor,
 def subquery_to_querydict(qs: str, fields_sep: str = None,
                           values_sep: str = None) -> QueryDict:
     """Create a `QueryDict` out of a subquery string.
-    
+
     Subquery strings are value of commands using different key/value pairs,
     such as `c:annotate` or `c:join`.
     
-    `fields_sep` is used to separate field/value pairs.
-    `values_sep` is used to separate values in a field.
+    Parameters :
+        * `qs` (`str`) - subquery string.
+        * `fields_sep` (`str`) - field/value pairs separator, default to
+          [DGEQ_SUBQUERY_SEP_FIELDS](settings.md#dgeq_subquery_sep_fields).
+        * `values_sep` (`str`) - values separator, default to
+          [DGEQ_SUBQUERY_SEP_VALUES](settings.md#dgeq_subquery_sep_values).
     
-    Raise `ValueError` if no `=` is found in a key/value pair:
-    
-    >>> subquery_to_querydict("field1=value^field_value_without_equal", "^")
-    Traceback (most recent call last):
-        ...
-    ValueError: A key/value pair must contains an equal '=', received
-    'field_value_without_equal'
+    Raises :
+        * `ValueError` if no `=` is found in a key/value pair:
     """
     if fields_sep is None:
         fields_sep = constants.DGEQ_SUBQUERY_SEP_FIELDS
@@ -298,12 +313,27 @@ def subquery_to_querydict(qs: str, fields_sep: str = None,
 
 
 
-def split_list_strings(lst: Iterable[str], sep: str = ',') -> List[str]:
+def split_list_values(lst: Iterable[str], sep: str = ',') -> List[str]:
     """Return a list of the words in each string of `lst`, using `sep` as
     delimiter.
     
-    >>> split_list_strings(["one,two", "three", "four,five,six"], ",")
-    ['one', 'two', 'three', 'four', 'five', 'six']"""
+    Since most commands accept multiple value in two way :
+    
+    * With a separator, e.g. `length=>5000,<6000`
+    * Reusing the field, e.g. `length=>5000&length=<6000`
+    
+    If both are combine, e.g. `length=>5000,<6000&length=!5500`, this can
+    result in a QueryDict like this :
+    
+    * `<QueryDict: {'rivers.length': ['>5000,<6000', '!5500']}>`
+    
+    This function split every element in a list of unique value :
+    
+    ```python
+    >>> utils.split_list_values(['>5000,<6000', '!5500'], ",")
+    ['>5000', '<6000', '!5500']
+    ```
+    """
     return reduce(operator.add, (i.split(sep) for i in lst)) if lst else []
 
 
@@ -333,15 +363,20 @@ def split_related_field(model: Type[models.Model], fields: Iterable[str],
                         ) -> Tuple[Set[str], Set[str], Set[str]]:
     """Split the given `fields` of `model` into a tuple of iterables
     `(fields, one_fields, many_fields)`.
-    
-    `one_fields` contains fields that are either `ForeignKey`, `OneToOneField`
-    or `OneToOneRel`.
-    `many_fields` contains fields that are either `ManyToManyField`,
-    `ManyToManyRel` or `ManyToOneRel`.
-    `fields` contains all other fields.
-    
-    `arbitrary_fields` must be an iterable of the arbitrary fields added by
-    `QuerySet`'s method like `annotation()`."""
+
+    * `one_fields` contains fields that are either `ForeignKey`, `OneToOneField`
+      or `OneToOneRel`.
+    * `many_fields` contains fields that are either `ManyToManyField`,
+      `ManyToManyRel` or `ManyToOneRel`.
+    * `fields` contains all other fields.
+
+    Parameters :
+        * `model` (`Type[models.Model]`) - Model to retrieve the field from.
+        * `fields` (`str`) - Fields to be organized.
+        * `arbitrary_fields` (`Iterable[str]`) - Optional list of arbitrary
+          fields not present by default in the model, e.g. fields added by
+          annotations.
+    """
     set_fields = set()
     one_fields = set()
     many_fields = set()
@@ -394,7 +429,13 @@ def serialize(instance: models.Model, public_fields: FieldMapping = None,
               private_fields: FieldMapping = None, user: [User, AnonymousUser] = None,
               use_permissions: bool = False) -> Dict[str, Any]:
     """Serialize an `instance` the same way `dgeq.GenericQuery` would serialize
-    a row."""
+    a row.
+    
+    Parameters :
+        * `model` (`Type[models.Model]`) - Queried `Model`.
+        * `public_fields`, `private_fields`, `user`, `use_permissions` - Allow
+          filtering which field can be retrieved. See [`Censor`](censor.md).
+    """
     if use_permissions and user is None:
         raise ValueError("user should be provided if use_permissions is set to True")
     

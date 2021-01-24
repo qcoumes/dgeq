@@ -192,7 +192,7 @@ class Annotation:
         
         # Retrieve optional filters used for the annotation
         filters = list()
-        for f in utils.split_list_strings(query_dict.getlist("filters"), "'"):
+        for f in utils.split_list_values(query_dict.getlist("filters"), "'"):
             kwarg = f.split('=', 1)
             if len(kwarg) < 2:
                 raise InvalidCommandError(

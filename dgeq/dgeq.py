@@ -3,7 +3,7 @@ import re
 import time
 from typing import Any, Dict, List, TYPE_CHECKING, Type, Union
 
-from django.db import models
+from django.db import connection, models
 from django.http import QueryDict
 
 from . import utils
@@ -18,9 +18,10 @@ logger = logging.getLogger(__file__)
 
 QueryDictType = Union[QueryDict, Type[QueryDict]]
 
-
 if TYPE_CHECKING:
     from django.contrib.auth.models import AnonymousUser, User
+
+
 
 class GenericQuery(JoinMixin):
     """Main class of the `dgeq` module.
@@ -64,7 +65,6 @@ class GenericQuery(JoinMixin):
         super().__init__()
         
         self._query_dict_list = list(query_dict.lists())
-        self._time = time.time()
         
         self.model = model
         self.censor = Censor(public_fields, private_fields, user, use_permissions)
@@ -114,6 +114,9 @@ class GenericQuery(JoinMixin):
         Execute commands in `DGEQ_COMMANDS` on each field/value of the query
         when the field match the command's regex. This function then compute the
         resulting rows."""
+        start_time = time.time()
+        start_query = len(connection.queries)
+        
         try:
             for field, lst in self._query_dict_list:
                 matching_commands = (c for c in DGEQ_COMMANDS if re.match(c.regex, field))
@@ -124,7 +127,7 @@ class GenericQuery(JoinMixin):
                 self.result['rows'] = self._evaluate()
             
             if self.time:
-                self.result["time"] = time.time() - self._time
+                self.result["time"] = time.time() - start_time
             
             result = self.result
         
@@ -144,4 +147,8 @@ class GenericQuery(JoinMixin):
                 "code":    "UNKNOWN"
             }
         
+        logging.debug(
+            f"The computation of this query string took {time.time() - start_time} seconds and "
+            f"made {len(connection.queries) - start_query} queries to the database."
+        )
         return result

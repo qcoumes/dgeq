@@ -53,14 +53,13 @@ class Censor:
     `ValueError` will be raised.
     
     Parameters:
-    
-    * `public` (`Dict[Type[models.Model], Iterable[str]]`) - A `dict` mapping a
-      `Model` to a list of its public fields.
-    * `private` (`Dict[Type[models.Model], Iterable[str]]`) - A `dict` mapping a
-      `Model` to a list of its private fields.
-    * `user` (`User`) - User used to check permissions.
-    * `use_permission` (`bool`) - Whether the `view` permission of related
-      `Model` will be checked.
+        * `public` (`Dict[Type[models.Model], Iterable[str]]`) - A `dict`
+          mapping a `Model` to a list of its public fields.
+        * `private` (`Dict[Type[models.Model], Iterable[str]]`) - A `dict`
+          mapping a `Model` to a list of its private fields.
+        * `user` (`User`) - User used to check permissions.
+        * `use_permission` (`bool`) - Whether the `view` permission of related
+          `Model` will be checked.
     """
     
     

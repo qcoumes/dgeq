@@ -263,7 +263,7 @@ class SubqueryToQuerydictTestCase(TestCase):
 class SplitListStringTestCase(TestCase):
     
     def test(self):
-        lst = utils.split_list_strings(["one,two", "three", "four,five,six"], ",")
+        lst = utils.split_list_values(["one,two", "three", "four,five,six"], ",")
         self.assertEqual(['one', 'two', 'three', 'four', 'five', 'six'], lst)
 
 
