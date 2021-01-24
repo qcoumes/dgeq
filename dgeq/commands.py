@@ -321,8 +321,8 @@ class Join(Command):
             query_joins.items(), key=lambda i: i[0].count("__")
         )
         
-        for field, join in sorted_query_join:
-            query.add_join(field, join, query.model, query.censor)
+        for f, j in sorted_query_join:
+            query.add_join(f, j, query.model, query.censor)
         
         # Prefetch joins
         for j in query.joins.values():
@@ -419,15 +419,17 @@ class Subset(Command):
                     f'c:limit', f"value must be a non-negative integers (received '{values[-1]}')"
                 )
             limit = int(values[-1])
-            if limit > DGEQ_MAX_LIMIT:
+            if limit > settings.DGEQ_MAX_LIMIT:
                 raise InvalidCommandError(
                     f'c:limit',
                     f"value cannot be higher than '{DGEQ_MAX_LIMIT}' (received '{limit}')"
                 )
-            if limit:
-                query.queryset = query.queryset[:limit]
-                query.sliced = True
-                query.limit_set = True
+            elif limit == 0:
+                limit = settings.DGEQ_MAX_LIMIT
+            
+            query.queryset = query.queryset[:limit]
+            query.sliced = True
+            query.limit_set = True
 
 
 

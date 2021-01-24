@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.db import models
 from django.http import QueryDict
@@ -378,7 +379,7 @@ class SubsetTestCase(TestCase):
         commands.Subset()(dgeq, "c:limit", values)
         rows = dgeq._evaluate()
         self.assertEqual(
-            Country.objects.all().count(),
+            settings.DGEQ_MAX_LIMIT,
             len(rows)
         )
     
@@ -389,7 +390,7 @@ class SubsetTestCase(TestCase):
         commands.Subset()(dgeq, "c:limit", values)
         rows = dgeq._evaluate()
         self.assertEqual(
-            Country.objects.all()[:89].count(),
+            89,
             len(rows)
         )
     
@@ -400,7 +401,7 @@ class SubsetTestCase(TestCase):
         commands.Subset()(dgeq, "c:limit", ["0"])
         rows = dgeq._evaluate()
         self.assertEqual(
-            Country.objects.all()[4:].count(),
+            Country.objects.all()[4:DGEQ_MAX_LIMIT + 4].count(),
             len(rows)
         )
         self.assertEqual(

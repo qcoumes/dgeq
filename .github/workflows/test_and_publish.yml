@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ 3.6, 3.7, 3.8, 3.9 ]
-        django-version: [ 2.0, 2.1, 2.2, 3.0, 3.1 ]
+        django-version: [ 20, 21, 22, 30, 31 ]
 
     steps:
       - uses: actions/checkout@v2
@@ -34,18 +34,11 @@ jobs:
         run: |
           pip install tox
 
-      - name: Setup Test Project
-        run: |
-          python3 manage.py makemigrations
-          python3 manage.py migrate
-
       - name: Run Tox
-        env:
-          TOX_ENV: py${{ matrix.python-version}}-django${{ matrix.django-version }}
-        run: tox -e $TOX_ENV
+        run: tox -e py-django${{ matrix.django-version }}
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == 3.9 && matrix.django-version == 3.1
+        if: matrix.python-version == 3.9 && matrix.django-version == 31
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage.xml
@@ -59,10 +52,10 @@ jobs:
     steps:
       - uses: actions/checkout@master
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: 3.9
 
       - name: Creating Built Distributions
         run: python setup.py sdist
