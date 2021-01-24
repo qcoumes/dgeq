@@ -2,6 +2,10 @@
 
 #### 0.4.0
 
+* Updated github workflows.
+
+#### 0.4.0
+
 Breaking changes.
 
 * Rewritten most of the project.

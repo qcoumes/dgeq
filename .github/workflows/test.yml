@@ -1,4 +1,4 @@
-name: Python package
+name: Tests
 
 on:
   push:
@@ -10,10 +10,6 @@ on:
     branches:
       - master
       - '*.*.*'
-
-  schedule:
-    - cron: '0 6 * * 1'
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -42,26 +38,3 @@ jobs:
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage.xml
-
-  publish:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
-    continue-on-error: true
-    needs: test
-
-    steps:
-      - uses: actions/checkout@master
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.9
-
-      - name: Creating Built Distributions
-        run: python setup.py sdist
-
-      - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          password: ${{ secrets.pypi_password }}
-          skip_existing: true
