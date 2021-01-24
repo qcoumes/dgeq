@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # more information.
 DGEQ_PRIVATE_FIELDS = getattr(settings, "DGEQ_PRIVATE_FIELDS", {})
 DGEQ_PUBLIC_FIELDS = getattr(settings, "DGEQ_PUBLIC_FIELDS", {
-    "django.contrib.auth.models.User": ["username"]
+    "django.contrib.auth.models.User": ["id", "username"]
 })
 
 
