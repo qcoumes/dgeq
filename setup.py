@@ -36,7 +36,7 @@ short_description = (
     " - https://dgeq.readthedocs.io/"
 )
 long_description = (codecs.open(os.path.join(dirname, 'README.md'), encoding='utf-8').read() + '\n'
-                    + codecs.open(os.path.join(dirname, 'documentation/CHANGELOG.md'), encoding='utf-8').read())
+                    + codecs.open(os.path.join(dirname, 'docs/CHANGELOG.md'), encoding='utf-8').read())
 
 setup(
     name='dgeq',

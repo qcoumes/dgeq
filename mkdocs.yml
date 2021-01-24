@@ -1,26 +1,32 @@
 site_name: DGeQ Documentation
 site_author: qcoumes
 repo_url: https://github.com/qcoumes/dgeq/
-docs_dir: documentation/
+docs_dir: docs/
 use_directory_urls: true
 
 nav:
   - Introduction: index.md
-  - Getting Started: getting_start.md
-  - Settings: settings.md
-  - GenericQuery : generic_query.md
-  - Censor: censor.md
-  - Errors: errors.md
-  - Syntax: query_syntax.md
-  - "Test it online!": https://dgeq.qcoumes.com/
+
+  - "Getting Started":
+    - Quickstart: getting_start.md
+    - Settings: settings.md
+    - GenericQuery : generic_query.md
+    - Censor: censor.md
+
+  - "API End-User":
+      - Syntax: query_syntax.md
+      - Errors: errors.md
+      - "Test it online!": https://dgeq.qcoumes.com/
+
+  - "Advanced Usage":
+      - Commands: commands.md
+      - Types: types.md
 
   - Changelog: CHANGELOG.md
   - License: LICENSE.md
   - Github: https://github.com/qcoumes/dgeq/
 
-  - "Technical documentation" :
-      - Commands: commands.md
-      - Types: types.md
+
 
 
 extra_css:

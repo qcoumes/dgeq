@@ -1,6 +1,4 @@
-# 
-
-## `GenericQuery`
+# `GenericQuery`
 
 ```python
 class GenericQuery(model, query_dict, public_fields=None, private_fields=None,

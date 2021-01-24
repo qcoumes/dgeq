@@ -35,7 +35,7 @@ or a front-end framework.
 * Highly customizable : Allow the creation of new type, lookup function and commands. Parts of the
   *query string* syntax can also be customized.
 
-You can find more about the syntax and the possibility it offers [here](../dgeq/template/query_syntax.md).
+You can find more about the syntax, and the possibility it offers [here](query_syntax.md).
 
 ## Requirements
 
