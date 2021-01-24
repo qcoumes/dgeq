@@ -136,11 +136,11 @@ class GenericQuery(JoinMixin):
                 **{a: getattr(e, a) for a in e.details}
             }
         
-        except Exception as e:  # pragma: no cover
+        except Exception:  # pragma: no cover
             logger.warning("Unknown error in dgeq:", exc_info=True)
             result = {
                 "status":  False,
-                "message": str(e),
+                "message": "An unknown error occurred, please contact the administrator.",
                 "code":    "UNKNOWN"
             }
         
