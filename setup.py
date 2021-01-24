@@ -14,7 +14,6 @@ CLASSIFIERS = [
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: Internet',
     'Topic :: Database',
-    'Topic :: REST',
     'Environment :: Web Environment',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3.6',
