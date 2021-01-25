@@ -26,6 +26,8 @@ nav:
 
   - "Other":
     - Changelog: CHANGELOG.md
+    - Contributing: CONTRIBUTING.md
+    - "Code of Conduct": CODE_OF_CONDUCT.md
     - License: LICENSE.md
     - Github: https://github.com/qcoumes/dgeq/
 
