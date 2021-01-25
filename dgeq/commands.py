@@ -242,8 +242,8 @@ class Filtering(Command):
     * `~` (`country/?name=~z`) - Do not contain a string.
     
     To combine search modifier, either use the comma `,` :
-    `country/?population=[500000,]500000`, or create another `field=value`
-    with the other modifier : `country/?population=[500000&population=]500000`
+    `country/?population=[4700000,]4800000`, or create another `field=value`
+    with the other modifier : `country/?population=[4700000population=]4800000`
     
     Modifiers are combined with a logical `AND`. For instance to get all the
     country with their name starting with `United`, but that does not contains

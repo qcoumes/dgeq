@@ -16,7 +16,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from tests.website import views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', views.index, name='index'),
     path('geography/', include('django_dummy_app.urls', namespace="django_dummy_app")),
 ]

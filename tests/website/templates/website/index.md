@@ -1,4 +1,27 @@
-# Query Syntax
+# DGeQ
+
+This is a demonstration website for the [DGeQ](https://github.com/qcoumes/dgeq) package. Every link below can be used
+to check the resulting JSON.
+
+If you want to try writing query yourself, the valid enpoints are :
+
+* [`geography/continent/`](geography/continent/)
+
+* [`geography/region/`](geography/region/)
+
+* [`geography/country/`](geography/country/)
+
+* [`geography/river/`](geography/river/)
+
+* [`geography/mountain/`](geography/mountain/)
+
+* [`geography/forest/`](geography/forest/)
+
+* [`geography/disaster/`](geography/disaster/)
+
+The Models used are described in the chapter below.
+
+## Query Syntax
 
 
 Throughout this guide, we’ll refer to the following models, which refer to the world geography :
@@ -33,6 +56,12 @@ class Mountain(models.Model):
     countries = models.ManyToManyField(Country, related_name="mountains")
 
 
+class Forest(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    area = models.BigIntegerField()
+    countries = models.ManyToManyField(Country, related_name="forests")
+
+
 class Disaster(models.Model):
     event = models.CharField(max_length=255)
     date = models.DateTimeField()
@@ -47,8 +76,6 @@ Europe*, ...) which are in turn composed of `Country`.
 We then have `River` and `Mountain` that can be in multiple countries, and `Disaster` that
 can be in only one country.
 
-In the following example, the used URL pattern is `[model]/?[query]`. For instance, if we want to
-query the continent `Africa` : `continent/?name=Africa`.
 
 ## Filters
 
@@ -63,38 +90,38 @@ following data :
 
 ```json
 {
-    "event":"Flood",
-    "date":"2009-11-04T00:00:00Z",
-    "id":1,
-    "comment":"...",
-    "source":"IFRC",
-    "country": {
-        "area":591958,
-        "id":110,
-        "name":"Kenya",
-        "population":50221100,
-        "region":3,
-        "rivers":[...],
-        "mountains":[...],
-        "disasters":[...]
-    }
+  "event":"Flood",
+  "date":"2009-11-04T00:00:00Z",
+  "id":1,
+  "comment":"...",
+  "source":"IFRC",
+  "country": {
+    "area":591958,
+    "id":110,
+    "name":"Kenya",
+    "population":50221100,
+    "region":3,
+    "rivers":[...],
+    "mountains":[...],
+    "disasters":[...]
+  }
 }
 ```
 
 In order to find all the disaster in Kenya, on would use the following query string :
 
-* `disaster/?country.name=Kenya`
+* [`disaster/?country.name=Kenya`](geography/disaster/?country.name=Kenya)disaster/?country.name=Kenya)
 
 Default settings set the depth of nested fields to 10.
 
-* `disaster/?country.region.continent.name=Africa`
+* [`disaster/?country.region.continent.name=Africa`](geography/disaster/?country.region.continent.name=Africa)
 
 If you query directly on a related model, and not on one of its field (E.G. `country` instead of
 `country.name`), `DGeQ` will use it's primary key (most of the time `id`). For instance, the
 following queries are the same since `id` is the primary key of `Continent` :
 
-* `region/?continent=1`
-* `region/?continent.id=1`
+* [`region/?continent=1`](geography/region/?continent=1)
+* [`region/?continent.id=1`](geography/region/?continent.id=1)
 
 
 ## Value Types
@@ -121,24 +148,24 @@ of the value.
 
 | Modifier |           Example           |      Description       |
 |:--------:|-----------------------------|------------------------|
-|`<`       |`country/?population=<500000`|Less than.              |
-|`]`       |`country/?population=]500000`|Less than or equal.     |
-|`>`       |`country/?population=>500000`|Greater than.           |
-|`[`       |`country/?population=[500000`|Greater than or equal.  |
-|`!`       |`country/?population=!500000`|Different than.         |
-|`^`       |`country/?name=^United`      |Starts with a string.   |
-|`$`       |`country/?name=$Islands`     |Ends with a string.     |
-|`*`       |`country/?name=*istan`       |Contains a string.      |
-|`~`       |`country/?name=~z`           |Do not contain a string.|
+|`<`       |[`country/?population=<500000`](geography/country/?population=<500000)|Less than.              |
+|`]`       |[`country/?population=]500000`](geography/country/?population=]500000)|Less than or equal.     |
+|`>`       |[`country/?population=>500000`](geography/country/?population=>500000)|Greater than.           |
+|`[`       |[`country/?population=[500000`](geography/country/?population=[500000)|Greater than or equal.  |
+|`!`       |[`country/?population=!500000`](geography/country/?population=!500000)|Different than.         |
+|`^`       |[`country/?name=^United`](geography/country/?name=^United)      |Starts with a string.   |
+|`$`       |[`country/?name=$Islands`](geography/country/?name=$Islands)     |Ends with a string.     |
+|`*`       |[`country/?name=*istan`](geography/country/?name=*istan)       |Contains a string.      |
+|`~`       |[`country/?name=~z`](geography/country/?name=~z)           |Do not contain a string.|
 
 &nbsp;  
-To combine search modifier, either use the comma `,` : `country/?population=[4700000,]4800000`, or
-create another `field=value` with the other modifier : `country/?population=[4700000population=]4800000`
+To combine search modifier, either use the comma `,` : [`country/?population=[4700000,]4800000`](geography/country/?population=[4700000,]4800000), or
+create another `field=value` with the other modifier : [`country/?population=[4700000population=]4800000`](geography/country/?population=[4700000population=]4800000)
 
 Modifiers are combined with a logical `AND`. For instance to get all the country with their name
 starting with `United`, but not containing `States` :
 
-* `country/?name=^United,~States` or `country/?name=^United&name=~States`
+* [`country/?name=^United,~States`](geography/country/?name=^United,~States) or [`country/?name=^United&name=~States`](geography/country/?name=^United&name=~States)
 
 
 
@@ -152,17 +179,17 @@ filters.
 |:-------------:|----------------------------------|-----------------------|
 | `c:aggregate` | See [`c:aggregate`](#caggregate).| See [`c:aggregate`](#caggregate).|
 | `c:annotate`  | See [`c:annotate`](#annotate).   | See [`c:annotate`](#annotate).|
-| `c:case`      | `country/?c:case=0`               | Set whether a search should be case-sensitive (`1`) or not (`0`). Default to `1`.|
-| `c:count`     | `country/?c:count=1`              | If set to `1`, return the number of found item in the field `count` of the response. Default is `0`.
-| `c:distinct`  | `country/?c:distinct=1`           | If set to `1`, eliminate duplicate row. Duplicate row may appear when using `c:join`.|
-| `c:evaluate`  | `country/?c:evaluate=0`           | Do not retrieve any rows from the database if set to `0` (`rows` will be an empty list). This will make the request much faster and can be useful if you only want to count rows or create aggregations. Default to `1`|
-| `c:hide`      | `country/?c:hide=id,area`         | Include all field except the provided fields (comma `,` separated list). Will be ignored if `c:show` is present.|
+| `c:case`      | [`country/?c:case=0`](geography/country/?c:case=0)               | Set whether a search should be case-sensitive (`1`) or not (`0`). Default to `1`.|
+| `c:count`     | [`country/?c:count=1`](geography/country/?c:count=1)              | If set to `1`, return the number of found item in the field `count` of the response. Default is `0`.
+| `c:distinct`  | [`country/?c:distinct=1`](geography/country/?c:distinct=1)           | If set to `1`, eliminate duplicate row. Duplicate row may appear when using `c:join`.|
+| `c:evaluate`  | [`country/?c:evaluate=0`](geography/country/?c:evaluate=0)           | Do not retrieve any rows from the database if set to `0` (`rows` will be an empty list). This will make the request much faster and can be useful if you only want to count rows or create aggregations. Default to `1`|
+| `c:hide`      | [`country/?c:hide=id,area`](geography/country/?c:hide=id,area)         | Include all field except the provided fields (comma `,` separated list). Will be ignored if `c:show` is present.|
 | `c:join`      | See [`c:join`](#cjoin).          | See [`c:join`](#cjoin).|
-| `c:limit`     | `country/?c:limit=20`             | Limit the result to at most `X` rows, set to `0` to get the max number of row allowed (default to `10` but can be modified in the setting).|
-| `c:show`      | `country/?c:show=name,id`         | Only include the provided fields (comma `,` separated list).|
-| `c:sort`      | `country/?c:sort=-area,id`        | Sort the rows by the provided fields (comma `,` separated list). Prepend an hyphen `-` to use descending order on a specific field.|
-| `c:start`     | `country/?c:start=10`             | Start from the `Xth` row. Use in conjunction with `c:limit` to get a precise subset of row. For instance, using `c:start=10&c:limit=10` would yield the `10th` to `20th` objects. Default to `0`|
-| `c:time`      | `country/?c:time=1`               | Shows the time taken server-side in seconds to process your request.|
+| `c:limit`     | [`country/?c:limit=20`](geography/country/?c:limit=20)             | Limit the result to at most `X` rows, set to `0` to get the max number of row allowed (default to `10` but can be modified in the setting).|
+| `c:show`      | [`country/?c:show=name,id`](geography/country/?c:show=name,id)         | Only include the provided fields (comma `,` separated list).|
+| `c:sort`      | [`country/?c:sort=-area,id`](geography/country/?c:sort=-area,id)        | Sort the rows by the provided fields (comma `,` separated list). Prepend an hyphen `-` to use descending order on a specific field.|
+| `c:start`     | [`country/?c:start=10`](geography/country/?c:start=10)             | Start from the `Xth` row. Use in conjunction with `c:limit` to get a precise subset of row. For instance, using `c:start=10&c:limit=10` would yield the `10th` to `20th` objects. Default to `0`|
+| `c:time`      | [`country/?c:time=1`](geography/country/?c:time=1)               | Shows the time taken server-side in seconds to process your request.|
 
 &nbsp;  
 Note that the order of commands and filters within the query string does matter. Some command will
@@ -201,12 +228,12 @@ You can declare multiple aggregate using a comma `,` or declaring multiple time 
 For instance, if you need the maximum, minimum and average population of countries
 in Asia: :
 
-* `country/?region.continent.name=Asia&c:limit=100&c:evaluate=0&c:aggregate=field=population|func=avg|to=population_avg,field=population|func=max|to=population_max&c:aggregate=field=population|func=min|to=population_min`
+* [`country/?region.continent.name=Asia&c:limit=100&c:evaluate=0&c:aggregate=field=population|func=avg|to=population_avg,field=population|func=max|to=population_max&c:aggregate=field=population|func=min|to=population_min`](geography/country/?region.continent.name=Asia&c:limit=100&c:evaluate=0&c:aggregate=field=population|func=avg|to=population_avg,field=population|func=max|to=population_max&c:aggregate=field=population|func=min|to=population_min)
 
 Aggregation can also be done on model related to the one being queried using dot `.` notation.
 Here the average height of mountains in France as an example :
 
-* `country/?name=France&c:limit=100&c:evaluate=0&c:aggregate=field=mountains.height|func=avg|to=mountain_avg`
+* [`country/?name=France&c:limit=100&c:evaluate=0&c:aggregate=field=mountains.height|func=avg|to=mountain_avg`](geography/country/?name=France&c:limit=100&c:aggregate=field=mountains.height|func=avg|to=mountain_avg)
 
 ## `c:annotate`
 
@@ -229,11 +256,11 @@ one being queried using dot `.` notation.
 Filters must be given related to the main query model, and not the model used for the annotation.
 So if you have a query on `country/` and want to annotate on `rivers` count your query must be :
 
-* `country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=rivers.length=>2000`
+* [`country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=rivers.length=>2000`](geography/country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=rivers.length=>2000)
 
 and not:
 
-* `country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=length=>2000`
+* [`country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=length=>2000`](geography/country/?c:annotate=field=rivers|to=rivers_count|func=count|filters=length=>2000)
 
 note the field used in `filters`.
 
@@ -244,13 +271,13 @@ average for instance.
 Let's see some examples of annotations:
 
 * Country sorted (desc) by their longest river :  
-  `country/?c:annotate=field=rivers.length|to=river_length|func=max&c:sort=river_length&c:limit=0`
+  [`country/?c:annotate=field=rivers.length|to=river_length|func=max&c:sort=river_length&c:limit=0`](geography/country/?c:annotate=field=rivers.length|to=river_length|func=max&c:sort=river_length&c:limit=0)
 * Country with at least 5 mountains taller than 2000 meters :  
-  `country/?c:annotate=field=mountains|to=mountain_count|func=count|filters=mountains.height=>2000&mountain_count=[5&c:limit=0`
+  [`country/?c:annotate=field=mountains|to=mountain_count|func=count|filters=mountains.height=>2000&mountain_count=[5&c:limit=0`](geography/country/?c:annotate=field=mountains|to=mountain_count|func=count|filters=mountains.height=>2000&mountain_count=[5&c:limit=0)
 * Population of each continent :  
-  `continent/?c:annotate=field=regions.countries.population|func=sum|to=population&c:show=name,population&c:limit=0`
+  [`continent/?c:annotate=field=regions.countries.population|func=sum|to=population&c:show=name,population&c:limit=0`](geography/continent/?c:annotate=field=regions.countries.population|func=sum|to=population&c:show=name,population&c:limit=0)
 * Average number of mountain in a country in the world:  
-  `country/?c:annotate=field=mountains|to=mountain_count|func=count&c:aggregate=field=mountain_count|func=avg|to=mountain_count_avg&c:limit=0`
+  [`country/?c:annotate=field=mountains|to=mountain_count|func=count&c:aggregate=field=mountain_count|func=avg|to=mountain_count_avg&c:limit=0`](geography/country/?c:annotate=field=mountains|to=mountain_count|func=count&c:aggregate=field=mountain_count|func=avg|to=mountain_count_avg&c:limit=0)
 
 
 ## `c:join`
@@ -283,22 +310,22 @@ The following keys only make sense when `field` is either a `ManyToManyField`, i
 Here some example :
 
 * Join the field `regions` of the model `Continent`, hiding their countries :  
-  `continent/?c:join=field=regions|hide=countries`
+  [`continent/?c:join=field=regions|hide=countries`](geography/continent/?c:join=field=regions|hide=countries)
 * Join every earthquake of Japan :  
-  `country/?name=Japan&c:join=field=disasters|filters=event=*arthquake`
+  [`country/?name=Japan&c:join=field=disasters|filters=event=*arthquake`](geography/country/?name=Japan&c:join=field=disasters|filters=event=*arthquake)
 * Join the second highest mountain of China :  
-  `country/?name=China&c:join=field=mountains|show=name|start=1|limit=1|sort=-height&c:hide=disasters,forests,rivers`
+  [`country/?name=China&c:join=field=mountains|show=name|start=1|limit=1|sort=-height&c:hide=disasters,forests,rivers`](geography/country/?name=China&c:join=field=mountains|show=name|start=1|limit=1|sort=-height&c:hide=disasters,forests,rivers)
 
 Note that you can do nested join using dot `.`. For instance to get the `Region` of a `Disaster` :
 
-* `disaster/?id=1&c:join=field=country.region`
+* [`disaster/?id=1&c:join=field=country.region`](geography/disaster/?id=1&c:join=field=country.region)
 
 In this case, the field `country` will also be joined, but only its field `region` will be in the
 rows. If you want to get an other field, you must also join this field on its own :
 
-* `disaster/?id=1&c:join=field=country,field=country.region`
+* [`disaster/?id=1&c:join=field=country,field=country.region`](geography/disaster/?id=1&c:join=field=country,field=country.region)
 
 The order of joins does not matter, these two request give the same rows :
 
-* `disaster/?id=1&c:join=field=country,field=country.region`
-* `disaster/?id=1&c:join=field=country.region,field=country`
+* [`disaster/?id=1&c:join=field=country,field=country.region`](geography/disaster/?id=1&c:join=field=country,field=country.region)
+* [`disaster/?id=1&c:join=field=country.region,field=country`](geography/disaster/?id=1&c:join=field=country.region,field=country)

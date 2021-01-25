@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'website',
 ]
 
 MIDDLEWARE = [
@@ -161,7 +162,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
-
-DGEQ_MAX_NESTED_FIELD_DEPTH = 4
 
 DGEQ_MAX_LIMIT = 100
