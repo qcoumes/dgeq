@@ -1,11 +1,11 @@
 # Introduction
 
 [![PyPI Version](https://badge.fury.io/py/dgeq.svg)](https://badge.fury.io/py/dgeq)
+[![Documentation Status](https://readthedocs.org/projects/dgeq/badge/?version=latest)](https://dgeq.readthedocs.io/en/latest/?badge=latest)
+![Tests](https://github.com/qcoumes/dgeq/workflows/Tests/badge.svg)
 [![Python 3.6+](https://img.shields.io/badge/Python-3.6+-brightgreen.svg)](#)
 [![Django 2.0+, 3.0+](https://img.shields.io/badge/Django-2.0+,%203.0+-brightgreen.svg)](#)
 [![License MIT](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/qcoumes/dgeq/blob/master/LICENSE)
-[![Python package](https://github.com/qcoumes/dgeq/workflows/Python%20package/badge.svg)](https://github.com/qcoumes/dgeq/actions/)
-[![Documentation Status](https://readthedocs.org/projects/dgeq/badge/?version=master)](https://dgeq.readthedocs.io/?badge=master)
 [![codecov](https://codecov.io/gh/qcoumes/dgeq/branch/master/graph/badge.svg)](https://codecov.io/gh/qcoumes/dgeq)
 [![CodeFactor](https://www.codefactor.io/repository/github/qcoumes/dgeq/badge)](https://www.codefactor.io/repository/github/qcoumes/dgeq)
 
